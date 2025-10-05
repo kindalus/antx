@@ -125,16 +125,12 @@ func (c *client) ListNodes(parent string) ([]Node, error) {
 		return nil, NewHttpErrorWithRequestBody(resp, req, "")
 	}
 
-	var result struct {
-		Nodes []Node `json:"nodes"`
-		Total int    `json:"total"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	var nodes []Node
+	if err := json.NewDecoder(resp.Body).Decode(&nodes); err != nil {
 		return nil, err
 	}
 
-	return result.Nodes, nil
+	return nodes, nil
 }
 
 func (c *client) CreateFolder(parent, name string) (*Node, error) {
@@ -514,12 +510,29 @@ func (c *client) EvaluateNode(uuid string) ([]Node, error) {
 
 	// The evaluate endpoint returns a generic object, but for smartfolders
 	// it should contain a "nodes" array similar to the find result
-	var result []Node
+	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 
-	return result, nil
+	// Try to extract nodes array from the result
+	if nodesInterface, exists := result["nodes"]; exists {
+		// Convert the nodes interface to proper Node structs
+		nodesBytes, err := json.Marshal(nodesInterface)
+		if err != nil {
+			return nil, err
+		}
+
+		var nodes []Node
+		if err := json.Unmarshal(nodesBytes, &nodes); err != nil {
+			return nil, err
+		}
+
+		return nodes, nil
+	}
+
+	// If no nodes array found, return empty slice
+	return []Node{}, nil
 }
 
 func (c *client) DownloadNode(uuid, downloadPath string) error {
