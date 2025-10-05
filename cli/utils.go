@@ -53,3 +53,43 @@ func convertValue(valueStr string) any {
 	// Return as string if no conversion worked
 	return valueStr
 }
+
+// normalizeOperators adds spaces around operators in query strings
+func normalizeOperators(input string) string {
+	operators := []string{"==", ">=", "<=", "!=", "~=", ">", "<"}
+
+	result := input
+	for _, op := range operators {
+		// Replace operator without spaces with operator with spaces
+		spaced := " " + op + " "
+		result = strings.ReplaceAll(result, op, spaced)
+	}
+
+	// Clean up multiple spaces
+	for strings.Contains(result, "  ") {
+		result = strings.ReplaceAll(result, "  ", " ")
+	}
+
+	return strings.TrimSpace(result)
+}
+
+// mksmart creates a smart folder with the given arguments
+func mksmart(args []string) {
+	if cmd, ok := commands["mksmart"]; ok {
+		cmd.Execute(args)
+	}
+}
+
+// cd executes the cd command with the given arguments
+func cd(args []string) {
+	if cmd, ok := commands["cd"]; ok {
+		cmd.Execute(args)
+	}
+}
+
+// ls executes the ls command with the given arguments
+func ls(args []string) {
+	if cmd, ok := commands["ls"]; ok {
+		cmd.Execute(args)
+	}
+}

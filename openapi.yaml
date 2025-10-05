@@ -54,7 +54,11 @@ paths:
       tags:
         - Features
       summary: List all features
-      description: Retrieve a list of all features in the system
+      description: |
+        Retrieve a comprehensive list of all features available in the system. Features are the core building blocks
+        of Antbox functionality and can be exposed as actions, extensions, or AI tools. This endpoint returns all
+        features regardless of their exposure settings, allowing administrators and developers to see the complete
+        feature catalog.
       responses:
         "200":
           description: List of features
@@ -74,7 +78,10 @@ paths:
       tags:
         - Features
       summary: Get feature by UUID
-      description: Retrieve a specific feature by its UUID
+      description: |
+        Retrieve detailed information about a specific feature using its unique identifier (UUID). This endpoint
+        returns the complete feature definition including metadata, parameters, exposure settings, and permissions.
+        Use this to inspect feature configuration before execution or modification.
       parameters:
         - $ref: "#/components/parameters/UuidPath"
       responses:
@@ -95,7 +102,10 @@ paths:
       tags:
         - Features
       summary: Delete feature
-      description: Delete a feature by its UUID
+      description: |
+        Permanently delete a feature from the system using its UUID. This operation removes the feature and all
+        its associated metadata. Note that this does not affect nodes created using the feature, but the feature
+        will no longer be available for new operations or executions.
       parameters:
         - $ref: "#/components/parameters/UuidPath"
       responses:
@@ -108,12 +118,15 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /features/{uuid}/-/export:
+  /features/{uuid}/export:
     get:
       tags:
         - Features
       summary: Export feature
-      description: Export a feature in various formats
+      description: |
+        Export a feature as executable JavaScript code. This endpoint generates the complete feature implementation
+        including its runtime dependencies and configuration. The export type parameter determines how the feature
+        is packaged: as a standalone feature, an action wrapper, or an extension wrapper.
       parameters:
         - $ref: "#/components/parameters/UuidPath"
         - name: type
@@ -257,13 +270,758 @@ paths:
         "405":
           $ref: "#/components/responses/MethodNotAllowed"
 
+  # Actions router endpoints
+  /actions:
+    get:
+      tags:
+        - Actions
+      summary: List all actions
+      description: |
+        Retrieve all features that are exposed as actions (where exposeAction=true). Actions are features designed
+        to operate on one or more nodes, typically performing transformations, validations, or batch operations.
+        This endpoint returns only the subset of features configured for action-based execution.
+      responses:
+        "200":
+          description: List of action-exposed features
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Feature"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /actions/{uuid}/run:
+    post:
+      tags:
+        - Actions
+      summary: Run an action
+      description: |
+        Execute a feature as an action on one or more nodes. The request body must include an array of node UUIDs
+        to process, and may optionally include additional parameters defined by the feature. The action will be
+        executed against each specified node, with results aggregated and returned in the response.
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionRunRequest"
+      responses:
+        "200":
+          description: Action execution result
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  # Extensions router endpoints
+  /extensions:
+    get:
+      tags:
+        - Extensions
+      summary: List all extensions
+      description: |
+        Retrieve all features that are exposed as extensions (where exposeExtension=true). Extensions are features
+        that provide custom UI, API endpoints, or interactive functionality. They receive the full HTTP Request
+        object and can return custom responses including HTML, JSON, or other content types.
+      responses:
+        "200":
+          description: List of extension-exposed features
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Feature"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /extensions/{uuid}/run:
+    post:
+      tags:
+        - Extensions
+      summary: Run an extension
+      description: |
+        Execute a feature as an extension by passing the complete HTTP Request object to the feature function.
+        Extensions have full access to request headers, body, query parameters, and can return any type of response.
+        This makes them ideal for creating custom APIs, webhooks, or interactive web interfaces.
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: Request body passed to the extension
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: true
+              description: Form data passed to the extension
+      responses:
+        "200":
+          description: Extension execution result
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+            text/html:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  # AI Tools router endpoints
+  /ai-tools:
+    get:
+      tags:
+        - AI Tools
+      summary: List all AI tools
+      description: |
+        Retrieve all features that are exposed as AI tools (where exposeAITool=true). AI tools are features that
+        can be called by AI agents to perform specific tasks or retrieve information. They are designed to be
+        discoverable and callable by language models through function calling mechanisms.
+      responses:
+        "200":
+          description: List of AI tool-exposed features
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Feature"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /ai-tools/{uuid}/run:
+    post:
+      tags:
+        - AI Tools
+      summary: Run an AI tool
+      description: |
+        Execute a feature as an AI tool with the provided parameters. AI tools are typically invoked by AI agents
+        during conversations to perform specific operations like data retrieval, calculations, or system interactions.
+        The parameters are defined by the feature's schema and validated before execution.
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: Parameters for the AI tool execution
+      responses:
+        "200":
+          description: AI tool execution result
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  # Agents router endpoints
+  /agents:
+    get:
+      tags:
+        - Agents
+      summary: List agents
+      description: |
+        Retrieve a list of all AI agents configured in the system. Agents are AI-powered assistants with specific
+        system instructions, capabilities, and configurations. Each agent can be customized with different models,
+        personalities, and access to specific AI tools for specialized tasks.
+      responses:
+        "200":
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Agent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+    post:
+      tags:
+        - Agents
+      summary: Create or replace agent
+      description: |
+        Create a new AI agent or replace an existing one with the same UUID. Agents are configured with system
+        instructions that define their behavior, personality, and capabilities. You can specify the AI model to use
+        and provide metadata like title and description for organizational purposes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentCreate"
+      responses:
+        "201":
+          description: Agent created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /agents/{uuid}:
+    get:
+      tags:
+        - Agents
+      summary: Get agent by UUID
+      description: Retrieve a specific AI agent by its UUID
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      responses:
+        "200":
+          description: Agent details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+    delete:
+      tags:
+        - Agents
+      summary: Delete agent
+      description: Delete an AI agent by its UUID
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      responses:
+        "200":
+          description: Agent deleted successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /agents/{uuid}/-/chat:
+    post:
+      tags:
+        - Agents
+      summary: Chat with agent
+      description: |
+        Send a chat message to an AI agent and receive a conversational response. This endpoint supports both
+        single messages and ongoing conversations using a conversation ID. You can attach files via multipart/form-data
+        for document analysis or context. The agent will respond according to its system instructions and may use
+        available AI tools to fulfill requests.
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentChatRequest"
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                input:
+                  type: string
+                  description: JSON string containing message and options
+                file0:
+                  type: string
+                  format: binary
+                  description: Optional file attachment (can include multiple files as file0, file1, etc.)
+              required:
+                - input
+      responses:
+        "200":
+          description: Chat response from agent
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /agents/{uuid}/-/answer:
+    post:
+      tags:
+        - Agents
+      summary: Get answer from agent
+      description: |
+        Send a query to an AI agent and receive a direct, focused answer. Unlike chat, which maintains conversation
+        context, this endpoint is optimized for one-off questions requiring immediate responses. Supports file
+        attachments for context and can leverage AI tools for comprehensive answers.
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentAnswerRequest"
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                input:
+                  type: string
+                  description: JSON string containing query and options
+                file0:
+                  type: string
+                  format: binary
+                  description: Optional file attachment (can include multiple files as file0, file1, etc.)
+              required:
+                - input
+      responses:
+        "200":
+          description: Answer from agent
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /agents/rag/-/chat:
+    post:
+      tags:
+        - Agents
+      summary: RAG chat
+      description: |
+        Perform a RAG (Retrieval-Augmented Generation) chat operation that combines document retrieval with AI
+        generation. The system searches through indexed documents using the provided filters, retrieves relevant
+        context, and generates responses grounded in the retrieved information for accurate, source-based answers.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RagChatRequest"
+      responses:
+        "200":
+          description: RAG chat response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  # API Keys router endpoints
+  /api-keys:
+    get:
+      tags:
+        - API Keys
+      summary: List API keys
+      description: |
+        Retrieve a list of all API keys in the system. API keys provide programmatic access to the Antbox API
+        and are associated with specific groups for access control. Use this endpoint to manage and audit API
+        key usage across your organization.
+      responses:
+        "200":
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiKey"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+    post:
+      tags:
+        - API Keys
+      summary: Create API key
+      description: |
+        Create a new API key for programmatic access to the Antbox API. Each API key is associated with a specific
+        group, inheriting that group's permissions and access rights. Include an optional description to help
+        identify the key's purpose or usage context.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiKeyCreate"
+      responses:
+        "201":
+          description: API key created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKey"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api-keys/{uuid}:
+    get:
+      tags:
+        - API Keys
+      summary: Get API key by UUID
+      description: Retrieve a specific API key by its UUID
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      responses:
+        "200":
+          description: API key details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKey"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+    delete:
+      tags:
+        - API Keys
+      summary: Delete API key
+      description: Delete an API key by its UUID
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      responses:
+        "200":
+          description: API key deleted successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  # Users router endpoints
+  /users:
+    get:
+      tags:
+        - Users
+      summary: List users
+      description: Retrieve a list of all users
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+    post:
+      tags:
+        - Users
+      summary: Create user
+      description: Create a new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+      responses:
+        "201":
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /users/{email}:
+    get:
+      tags:
+        - Users
+      summary: Get user by email
+      description: Retrieve a specific user by their email address
+      parameters:
+        - name: email
+          in: path
+          required: true
+          description: User email address
+          schema:
+            type: string
+            format: email
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+    put:
+      tags:
+        - Users
+      summary: Update user
+      description: Update an existing user's information
+      parameters:
+        - name: email
+          in: path
+          required: true
+          description: User email address
+          schema:
+            type: string
+            format: email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /users/{uuid}:
+    delete:
+      tags:
+        - Users
+      summary: Delete user
+      description: Delete a user by their UUID
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      responses:
+        "200":
+          description: User deleted successfully
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  # Groups router endpoints
+  /groups:
+    get:
+      tags:
+        - Groups
+      summary: List groups
+      description: Retrieve a list of all groups
+      responses:
+        "200":
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Group"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+    post:
+      tags:
+        - Groups
+      summary: Create group
+      description: Create a new group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupCreate"
+      responses:
+        "201":
+          description: Group created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /groups/{uuid}:
+    get:
+      tags:
+        - Groups
+      summary: Get group by UUID
+      description: Retrieve a specific group by its UUID
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      responses:
+        "200":
+          description: Group details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+    put:
+      tags:
+        - Groups
+      summary: Update group
+      description: Update an existing group's information
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupUpdate"
+      responses:
+        "200":
+          description: Group updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+    delete:
+      tags:
+        - Groups
+      summary: Delete group
+      description: Delete a group by its UUID
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      responses:
+        "200":
+          description: Group deleted successfully
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
   # Node management endpoints
   /nodes:
     get:
       tags:
         - Nodes
       summary: List nodes
-      description: Retrieve a list of nodes with optional filtering
+      description: |
+        Retrieve a list of nodes with optional filtering by parent folder, MIME type, or result limit. Nodes are
+        the fundamental data structures in Antbox, representing files, folders, and other content types. Use this
+        endpoint to browse the node hierarchy or find nodes matching specific criteria.
       parameters:
         - name: parent
           in: query
@@ -303,7 +1061,10 @@ paths:
       tags:
         - Nodes
       summary: Create node
-      description: Create a new node
+      description: |
+        Create a new node in the system. Nodes can be created with JSON data or file uploads via multipart/form-data.
+        Specify the parent folder UUID to place the node in the hierarchy, and set the appropriate MIME type to
+        define how the node should be handled and displayed.
       requestBody:
         required: true
         content:
@@ -344,7 +1105,10 @@ paths:
       tags:
         - Nodes
       summary: Upload file
-      description: Upload a file as a new node
+      description: |
+        Upload a file as a new node using multipart/form-data. This endpoint is optimized for file uploads and
+        automatically sets the MIME type based on the file content. Ideal for integrating file upload functionality
+        in web applications or CLI tools.
       requestBody:
         required: true
         content:
@@ -547,9 +1311,8 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Node"
+                type: object
+                additionalProperties: true
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -562,7 +1325,10 @@ paths:
       tags:
         - Nodes
       summary: Find nodes with filters
-      description: Find nodes using filter criteria with pagination support
+      description: |
+        Find nodes using advanced filter criteria with pagination support. Supports both simple (1D) filters with
+        AND logic and complex (2D) filter groups with OR logic. Filter tuples use [field, operator, value] format
+        for precise querying across node properties like title, MIME type, owner, dates, and custom metadata.
       requestBody:
         required: true
         content:
@@ -603,7 +1369,10 @@ paths:
       tags:
         - Nodes
       summary: Update node with file upload
-      description: Update an existing node by uploading a new file
+      description: |
+        Update an existing node by uploading a new file using multipart/form-data. This replaces the node's content
+        with the uploaded file while preserving the node's UUID and other metadata. Optionally update the title
+        and MIME type along with the file content.
       parameters:
         - $ref: "#/components/parameters/UuidPath"
       requestBody:
@@ -639,13 +1408,79 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /nodes/{uuid}/-/breadcrumbs:
+    get:
+      tags:
+        - Nodes
+      summary: Get folder breadcrumb trail
+      description: Retrieve the breadcrumb trail for a folder node, showing the path from root to the current folder. Only works for folder nodes.
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      responses:
+        "200":
+          description: Breadcrumb trail for the folder
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Breadcrumb"
+                description: Array of breadcrumb items from root to current folder
+        "400":
+          description: Bad request - node is not a folder
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # Templates endpoints
+  /templates/{uuid}:
+    get:
+      tags:
+        - Templates
+      summary: Get template content by UUID
+      description: |
+        Retrieve the raw content of a specific template file by its UUID. Templates are code files (TypeScript,
+        JavaScript, or JSON) stored in the templates directory and loaded dynamically at runtime. Use this endpoint
+        to fetch template content for features, actions, or configuration files. The response Content-Type matches
+        the template file type.
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      responses:
+        "200":
+          description: Template content
+          content:
+            text/typescript:
+              schema:
+                type: string
+                description: TypeScript template content
+            text/javascript:
+              schema:
+                type: string
+                description: JavaScript template content
+            application/json:
+              schema:
+                type: object
+                description: JSON template content
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   # Aspect endpoints
   /aspects:
     get:
       tags:
         - Aspects
       summary: List aspects
-      description: Retrieve a list of all aspects
+      description: |
+        Retrieve a list of all aspects in the system. Aspects are reusable metadata schemas that can be attached
+        to nodes to extend their properties and behavior. Use aspects to define custom fields, validation rules,
+        or business logic that can be applied consistently across multiple nodes.
       responses:
         "200":
           description: List of aspects
@@ -660,7 +1495,10 @@ paths:
       tags:
         - Aspects
       summary: Create or replace aspect
-      description: Create a new aspect or replace an existing one
+      description: |
+        Create a new aspect or replace an existing one with the same UUID. Aspects define reusable metadata schemas
+        that extend node capabilities. They can include custom properties, validation logic, and behavior definitions
+        that are applied to nodes when the aspect is attached.
       requestBody:
         required: true
         content:
@@ -792,6 +1630,13 @@ components:
 
     MethodNotAllowed:
       description: Method not allowed for this resource
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    ServiceUnavailable:
+      description: Service unavailable - the requested service is not available or not configured
       content:
         application/json:
           schema:
@@ -1088,12 +1933,330 @@ components:
           additionalProperties: true
           description: Additional error details
 
+    ActionRunRequest:
+      type: object
+      required:
+        - uuids
+      properties:
+        uuids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Array of node UUIDs to process with the action
+        parameters:
+          type: object
+          additionalProperties: true
+          description: Optional parameters for the action execution
+
+    Agent:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Unique identifier for the agent
+        systemInstructions:
+          type: string
+          description: System instructions for the AI agent
+        title:
+          type: string
+          description: Agent title
+        description:
+          type: string
+          description: Agent description
+        model:
+          type: string
+          description: AI model to use
+        owner:
+          type: string
+          description: Owner email
+        group:
+          type: string
+          description: Group UUID
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        modifiedAt:
+          type: string
+          format: date-time
+          description: Last modification timestamp
+
+    AgentCreate:
+      type: object
+      required:
+        - systemInstructions
+      properties:
+        systemInstructions:
+          type: string
+          description: System instructions for the AI agent
+        title:
+          type: string
+          description: Agent title
+        description:
+          type: string
+          description: Agent description
+        model:
+          type: string
+          description: AI model to use
+
+    AgentChatRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Chat message to send to the agent
+        conversationId:
+          type: string
+          description: Optional conversation ID to continue a previous conversation
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Temperature for response generation
+        maxTokens:
+          type: integer
+          description: Maximum tokens in the response
+
+    AgentAnswerRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Query to send to the agent
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Temperature for response generation
+        maxTokens:
+          type: integer
+          description: Maximum tokens in the response
+
+    RagChatRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Message for RAG chat
+        conversationId:
+          type: string
+          description: Optional conversation ID
+        filters:
+          type: object
+          additionalProperties: true
+          description: Optional filters for document retrieval
+
+    ApiKey:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Unique identifier for the API key
+        key:
+          type: string
+          description: The actual API key value
+        group:
+          type: string
+          description: Group UUID associated with this key
+        description:
+          type: string
+          description: Description of the API key
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        createdBy:
+          type: string
+          description: Email of user who created the key
+
+    ApiKeyCreate:
+      type: object
+      required:
+        - group
+      properties:
+        group:
+          type: string
+          description: Group UUID to associate with this API key
+        description:
+          type: string
+          description: Optional description for the API key
+
+    User:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Unique identifier for the user
+        email:
+          type: string
+          format: email
+          description: User email address
+        name:
+          type: string
+          description: User display name
+        group:
+          type: string
+          description: Group UUID
+        role:
+          type: string
+          description: User role
+        active:
+          type: boolean
+          description: Whether the user account is active
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+
+    UserCreate:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address
+        name:
+          type: string
+          description: User display name
+        password:
+          type: string
+          description: User password (will be hashed)
+        group:
+          type: string
+          description: Group UUID
+        role:
+          type: string
+          description: User role
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          description: User display name
+        password:
+          type: string
+          description: New password (will be hashed)
+        group:
+          type: string
+          description: Group UUID
+        role:
+          type: string
+          description: User role
+        active:
+          type: boolean
+          description: Whether the user account is active
+
+    Group:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Unique identifier for the group
+        name:
+          type: string
+          description: Group name
+        description:
+          type: string
+          description: Group description
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        modifiedAt:
+          type: string
+          format: date-time
+          description: Last modification timestamp
+
+    GroupCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Group name
+        description:
+          type: string
+          description: Group description
+
+    GroupUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Group name
+        description:
+          type: string
+          description: Group description
+
+    Template:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Unique identifier for the template
+        mimetype:
+          type: string
+          description: MIME type of the template (e.g., text/typescript, text/javascript, application/json)
+        size:
+          type: integer
+          description: Size of the template file in bytes
+      required:
+        - uuid
+        - mimetype
+        - size
+
+    Breadcrumb:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: UUID of the folder in the breadcrumb trail
+        title:
+          type: string
+          description: Title of the folder
+      required:
+        - uuid
+        - title
+
 tags:
   - name: Authentication
     description: Authentication and authorization endpoints
   - name: Features
     description: Feature management and execution
+  - name: Actions
+    description: Action execution endpoints for running features as actions
+  - name: Extensions
+    description: Extension execution endpoints for running features as extensions
+  - name: AI Tools
+    description: AI tool execution endpoints for running features as AI tools
+  - name: Agents
+    description: AI agent management and interaction endpoints
+  - name: API Keys
+    description: API key management endpoints
+  - name: Users
+    description: User account management endpoints
+  - name: Groups
+    description: Group management endpoints
   - name: Nodes
     description: Node management operations
+  - name: Templates
+    description: Template management operations
   - name: Aspects
     description: Aspect management operations

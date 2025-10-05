@@ -79,6 +79,25 @@ func (c *mockClient) DownloadNode(uuid, downloadPath string) error {
 	return nil
 }
 
+func (c *mockClient) GetBreadcrumbs(uuid string) ([]antbox.Node, error) {
+	return []antbox.Node{
+		{UUID: "--root--", Title: "root", Parent: ""},
+		{UUID: "test-uuid", Title: "test-title", Parent: "--root--"},
+	}, nil
+}
+
+func (c *mockClient) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int) (string, error) {
+	return "Mock chat response", nil
+}
+
+func (c *mockClient) AnswerFromAgent(agentUUID string, query string, temperature *float64, maxTokens *int) (string, error) {
+	return "Mock answer response", nil
+}
+
+func (c *mockClient) RagChat(message string, conversationID string, filters map[string]interface{}) (string, error) {
+	return "Mock RAG response", nil
+}
+
 func TestExecutor(t *testing.T) {
 	client = &mockClient{}
 
@@ -688,6 +707,25 @@ func (c *enhancedMockClient) EvaluateNode(uuid string) ([]antbox.Node, error) {
 
 func (c *enhancedMockClient) DownloadNode(uuid, downloadPath string) error {
 	return nil
+}
+
+func (c *enhancedMockClient) GetBreadcrumbs(uuid string) ([]antbox.Node, error) {
+	return []antbox.Node{
+		{UUID: "--root--", Title: "root", Parent: ""},
+		{UUID: "test-uuid", Title: "test-title", Parent: "--root--"},
+	}, nil
+}
+
+func (c *enhancedMockClient) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int) (string, error) {
+	return "Mock chat response", nil
+}
+
+func (c *enhancedMockClient) AnswerFromAgent(agentUUID string, query string, temperature *float64, maxTokens *int) (string, error) {
+	return "Mock answer response", nil
+}
+
+func (c *enhancedMockClient) RagChat(message string, conversationID string, filters map[string]interface{}) (string, error) {
+	return "Mock RAG response", nil
 }
 
 func TestSmartfolderCdAndLsBehavior(t *testing.T) {

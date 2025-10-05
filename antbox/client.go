@@ -30,7 +30,7 @@ func (c *client) roundTrip(req *http.Request) (*http.Response, error) {
 		if err != nil {
 			fmt.Println("Error dumping request:", err)
 		} else {
-			fmt.Printf("==> Request:\n%s\n", string(dump))
+			fmt.Printf("\nRequest >>>>>\n\n%s\n", string(dump))
 		}
 	}
 
@@ -41,7 +41,7 @@ func (c *client) roundTrip(req *http.Request) (*http.Response, error) {
 		if err != nil {
 			fmt.Println("Error dumping response:", err)
 		} else {
-			fmt.Printf("<== Response:\n%s\n", string(dump))
+			fmt.Printf(">>>>> Response\n\n%s\n=====\n\n", string(dump))
 		}
 	}
 
@@ -141,6 +141,48 @@ func (c *client) CreateFolder(parent, name string) (*Node, error) {
 	}
 
 	jsonNode, err := json.Marshal(newNode)
+	if err != nil {
+		return nil, err
+	}
+
+	// Store request body for error reporting
+	requestBodyStr := string(jsonNode)
+
+	req, err := http.NewRequest("POST", c.ServerURL+"/nodes", bytes.NewBuffer(jsonNode))
+	if err != nil {
+		return nil, err
+	}
+
+	c.SetAuthHeader(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, NewHttpErrorWithRequestBody(resp, req, requestBodyStr)
+	}
+	var node Node
+	if err := json.NewDecoder(resp.Body).Decode(&node); err != nil {
+		return nil, err
+	}
+
+	return &node, nil
+}
+
+func (c *client) CreateSmartFolder(parent, name string, filters any) (*Node, error) {
+	// Create the request payload with filters
+	payload := map[string]any{
+		"title":    name,
+		"parent":   parent,
+		"mimetype": "application/vnd.antbox.smartfolder",
+		"filters":  filters,
+	}
+
+	jsonNode, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
@@ -518,6 +560,193 @@ func (c *client) SetAuthHeader(req *http.Request) {
 	} else if c.APIKey != "" {
 		req.Header.Set("X-API-Key", c.APIKey)
 	}
+}
+
+func (c *client) GetBreadcrumbs(uuid string) ([]Node, error) {
+	req, err := http.NewRequest("GET", c.ServerURL+"/nodes/"+uuid+"/-/breadcrumbs", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	c.SetAuthHeader(req)
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, NewHttpErrorWithRequestBody(resp, req, "")
+	}
+
+	var breadcrumbs []Node
+	if err := json.NewDecoder(resp.Body).Decode(&breadcrumbs); err != nil {
+		return nil, err
+	}
+
+	return breadcrumbs, nil
+}
+
+func (c *client) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int) (string, error) {
+	payload := map[string]interface{}{
+		"message": message,
+	}
+
+	if conversationID != "" {
+		payload["conversationId"] = conversationID
+	}
+	if temperature != nil {
+		payload["temperature"] = *temperature
+	}
+	if maxTokens != nil {
+		payload["maxTokens"] = *maxTokens
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	endpoint := fmt.Sprintf("/agents/%s/-/chat", agentUUID)
+	req, err := http.NewRequest("POST", c.ServerURL+endpoint, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+
+	c.SetAuthHeader(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", NewHttpErrorWithRequestBody(resp, req, string(jsonData))
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	// Extract the response message
+	if response, ok := result["response"]; ok {
+		if responseStr, ok := response.(string); ok {
+			return responseStr, nil
+		}
+	}
+
+	// Fallback to return the whole response as JSON string
+	responseJson, _ := json.MarshalIndent(result, "", "  ")
+	return string(responseJson), nil
+}
+
+func (c *client) AnswerFromAgent(agentUUID string, query string, temperature *float64, maxTokens *int) (string, error) {
+	payload := map[string]interface{}{
+		"query": query,
+	}
+
+	if temperature != nil {
+		payload["temperature"] = *temperature
+	}
+	if maxTokens != nil {
+		payload["maxTokens"] = *maxTokens
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	endpoint := fmt.Sprintf("/agents/%s/-/answer", agentUUID)
+	req, err := http.NewRequest("POST", c.ServerURL+endpoint, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+
+	c.SetAuthHeader(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", NewHttpErrorWithRequestBody(resp, req, string(jsonData))
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	// Extract the response message
+	if response, ok := result["response"]; ok {
+		if responseStr, ok := response.(string); ok {
+			return responseStr, nil
+		}
+	}
+
+	// Fallback to return the whole response as JSON string
+	responseJson, _ := json.MarshalIndent(result, "", "  ")
+	return string(responseJson), nil
+}
+
+func (c *client) RagChat(message string, conversationID string, filters map[string]interface{}) (string, error) {
+	payload := map[string]interface{}{
+		"message": message,
+	}
+
+	if conversationID != "" {
+		payload["conversationId"] = conversationID
+	}
+	if filters != nil {
+		payload["filters"] = filters
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("POST", c.ServerURL+"/agents/rag/-/chat", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+
+	c.SetAuthHeader(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", NewHttpErrorWithRequestBody(resp, req, string(jsonData))
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	// Extract the response message
+	if response, ok := result["response"]; ok {
+		if responseStr, ok := response.(string); ok {
+			return responseStr, nil
+		}
+	}
+
+	// Fallback to return the whole response as JSON string
+	responseJson, _ := json.MarshalIndent(result, "", "  ")
+	return string(responseJson), nil
 }
 
 func expandTilde(path string) (string, error) {
