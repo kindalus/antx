@@ -40,6 +40,13 @@ The project is structured as follows:
 - **Node Information:**
   - `stat` - Display detailed node properties and metadata
 
+- **Action and Extension Operations:**
+  - `run` - Execute actions on nodes with optional parameters
+  - `call` - Execute extensions with optional parameters
+
+- **Template Operations:**
+  - `template` - Download templates to Downloads folder
+
 - **Enhanced User Experience:**
   - Interactive auto-completion with smart suggestions
   - Folder-only suggestions for navigation commands
@@ -73,6 +80,9 @@ Once connected, you can use familiar commands:
 - `rm node-uuid` - Delete files and folders
 - `mv source-uuid destination-uuid` - Move nodes
 - `rename node-uuid "new name"` - Rename nodes
+- `run action-uuid node-uuid param=value` - Execute actions on nodes
+- `call extension-uuid param=value` - Execute extensions
+- `template template-uuid` - Download templates
 
 All commands support intelligent auto-completion with suggestions appearing after typing 2+ characters.
 

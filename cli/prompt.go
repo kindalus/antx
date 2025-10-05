@@ -33,6 +33,9 @@ import (
 //   Options: -t <temperature>, -m <max_tokens>, -c <conversation_id>
 // - answer [options] <agent_uuid> <question>: Ask question to specific agent
 //   Options: -t <temperature>, -m <max_tokens>
+// - run <action_uuid> <node_uuid> [param=value...]: Run an action on a node with optional parameters
+// - call <extension_uuid> [param=value...]: Run an extension with optional parameters
+// - template <uuid>: Download a template to Downloads folder
 
 var (
 	client            antbox.Antbox
