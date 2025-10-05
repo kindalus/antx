@@ -99,10 +99,27 @@ func (c *RunCommand) Suggest(d prompt.Document) []prompt.Suggest {
 
 	switch argCount {
 	case 0:
-		// Suggesting action UUID - we could potentially list actions here
-		return []prompt.Suggest{
-			{Text: "", Description: "Enter action UUID"},
+		// Suggesting action UUID - list available actions
+		actions, err := client.ListActions()
+		if err != nil {
+			// Fallback to generic suggestion if API call fails
+			return []prompt.Suggest{
+				{Text: "", Description: "Enter action UUID"},
+			}
 		}
+
+		var suggests []prompt.Suggest
+		currentWord := d.GetWordBeforeCursor()
+		for _, action := range actions {
+			if strings.HasPrefix(strings.ToLower(action.UUID), strings.ToLower(currentWord)) ||
+				strings.HasPrefix(strings.ToLower(action.Title), strings.ToLower(currentWord)) {
+				suggests = append(suggests, prompt.Suggest{
+					Text:        action.UUID,
+					Description: action.Title,
+				})
+			}
+		}
+		return suggests
 	case 1:
 		// Suggesting node UUID
 		return getNodeSuggestions(d.GetWordBeforeCursor(), nil)
