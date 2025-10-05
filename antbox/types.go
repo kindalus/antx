@@ -22,11 +22,41 @@ type Node struct {
 	ModifiedAt  string       `json:"modifiedAt,omitempty"`
 }
 
+// HumanReadableSize returns a human-readable representation of the node's size
+func (n *Node) HumanReadableSize() string {
+	if n.Size == 0 {
+		return "0B"
+	}
+
+	const unit = 1024
+	units := []string{"B", "K", "M", "G", "T", "P"}
+
+	size := float64(n.Size)
+	unitIndex := 0
+
+	for size >= unit && unitIndex < len(units)-1 {
+		size /= unit
+		unitIndex++
+	}
+
+	if unitIndex == 0 {
+		return fmt.Sprintf("%.0f%s", size, units[unitIndex])
+	}
+
+	return fmt.Sprintf("%.1f%s", size, units[unitIndex])
+}
+
 type Permissions struct {
-	Group         []string               `json:"group,omitempty"`
-	Authenticated []string               `json:"authenticated,omitempty"`
-	Anonymous     []string               `json:"anonymous,omitempty"`
-	Advanced      map[string]interface{} `json:"advanced,omitempty"`
+	Group         []string       `json:"group,omitempty"`
+	Authenticated []string       `json:"authenticated,omitempty"`
+	Anonymous     []string       `json:"anonymous,omitempty"`
+	Advanced      map[string]any `json:"advanced,omitempty"`
+}
+
+type NodeFilterResult struct {
+	Nodes     []Node `json:"nodes"`
+	PageSize  int    `json:"pageSize"`
+	PageToken int    `json:"pageToken"`
 }
 
 type HttpError struct {
@@ -44,7 +74,7 @@ func (e *HttpError) Error() string {
 	var result strings.Builder
 
 	// Error header
-	result.WriteString(fmt.Sprintf("%s %s - %d\n\n", e.Method, e.URL, e.StatusCode))
+	result.WriteString(fmt.Sprintf("Error: %s %s - %d\n\n", e.Method, e.URL, e.StatusCode))
 
 	// Request section
 	result.WriteString("==> Request\n")
@@ -64,8 +94,6 @@ func (e *HttpError) Error() string {
 		result.WriteString(e.formatJSON(e.Body))
 		result.WriteString("\n")
 	}
-
-	result.WriteString("-----\n")
 
 	return result.String()
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -291,5 +293,141 @@ func TestHttpErrorNonJSON(t *testing.T) {
 	// Check Content-Type header
 	if !strings.Contains(errorMsg, "Content-Type: text/plain") {
 		t.Error("Expected Content-Type: text/plain header not found")
+	}
+}
+
+func TestRemoveNode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/nodes/test-uuid" {
+			t.Errorf("Expected to request '/nodes/test-uuid', got %s", r.URL.Path)
+		}
+		if r.Method != "DELETE" {
+			t.Errorf("Expected 'DELETE' request, got '%s'", r.Method)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "", "", "test-jwt")
+	err := client.RemoveNode("test-uuid")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+func TestMoveNode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/nodes/test-uuid" {
+			t.Errorf("Expected to request '/nodes/test-uuid', got %s", r.URL.Path)
+		}
+		if r.Method != "PATCH" {
+			t.Errorf("Expected 'PATCH' request, got '%s'", r.Method)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "", "", "test-jwt")
+	err := client.MoveNode("test-uuid", "parent-uuid")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+func TestChangeNodeName(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/nodes/test-uuid" {
+			t.Errorf("Expected to request '/nodes/test-uuid', got %s", r.URL.Path)
+		}
+		if r.Method != "PATCH" {
+			t.Errorf("Expected 'PATCH' request, got '%s'", r.Method)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "", "", "test-jwt")
+	err := client.ChangeNodeName("test-uuid", "new-name")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+func TestUploadFile(t *testing.T) {
+	// Create a temporary file for testing
+	tempFile, err := os.CreateTemp("", "test-upload-*.txt")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tempFile.Name())
+
+	testContent := "This is a test file content"
+	_, err = tempFile.WriteString(testContent)
+	if err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+	tempFile.Close()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/nodes" {
+			t.Errorf("Expected to request '/nodes', got %s", r.URL.Path)
+		}
+		if r.Method != "POST" {
+			t.Errorf("Expected 'POST' request, got '%s'", r.Method)
+		}
+		if !strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
+			t.Errorf("Expected multipart/form-data content type, got %s", r.Header.Get("Content-Type"))
+		}
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintln(w, `{"uuid":"uploaded-uuid","title":"test-file.txt"}`)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "", "", "test-jwt")
+	node, err := client.CreateFile(tempFile.Name(), "parent-uuid")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if node.UUID != "uploaded-uuid" {
+		t.Errorf("Expected uploaded UUID 'uploaded-uuid', got '%s'", node.UUID)
+	}
+}
+
+func TestDownloadNode(t *testing.T) {
+	testContent := "This is downloaded content"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/nodes/test-uuid/content" {
+			t.Errorf("Expected to request '/nodes/test-uuid/content', got %s", r.URL.Path)
+		}
+		if r.Method != "GET" {
+			t.Errorf("Expected 'GET' request, got '%s'", r.Method)
+		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, testContent)
+	}))
+	defer server.Close()
+
+	// Create a temporary directory for download
+	tempDir, err := os.MkdirTemp("", "test-download-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	downloadPath := filepath.Join(tempDir, "downloaded-file.txt")
+
+	client := NewClient(server.URL, "", "", "test-jwt")
+	err = client.DownloadNode("test-uuid", downloadPath)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Verify file was created and has correct content
+	content, err := os.ReadFile(downloadPath)
+	if err != nil {
+		t.Errorf("Failed to read downloaded file: %v", err)
+	}
+	if string(content) != testContent {
+		t.Errorf("Expected downloaded content '%s', got '%s'", testContent, string(content))
 	}
 }

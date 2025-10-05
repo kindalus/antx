@@ -1,6 +1,6 @@
 package main
 
-import "antbox-cli/cmd"
+import "github.com/kindalus/antx/cmd"
 
 func main() {
 	cmd.Execute()

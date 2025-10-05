@@ -1,4 +1,4 @@
-module antbox-cli
+module github.com/kindalus/antx
 
 go 1.25.0
 
