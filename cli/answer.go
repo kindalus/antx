@@ -108,12 +108,59 @@ func (c *AnswerCommand) Suggest(d prompt.Document) []prompt.Suggest {
 
 	lastArg := args[len(args)-1]
 
-	// Suggest flags if we're typing a flag or at the beginning
-	if strings.HasPrefix(lastArg, "-") || (len(args) <= 3 && !strings.HasSuffix(text, " ")) {
+	// Count actual arguments (excluding the command name and flags)
+	argCount := 0
+	flagCount := 0
+	for i := 1; i < len(args); i++ {
+		if strings.HasPrefix(args[i], "-") {
+			flagCount++
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				flagCount++ // Skip flag value
+				i++
+			}
+		} else if flagCount == 0 || i > flagCount {
+			argCount++
+		}
+	}
+
+	// Adjust for current typing
+	if !strings.HasSuffix(text, " ") && len(args) > 1 {
+		if strings.HasPrefix(lastArg, "-") {
+			// Currently typing a flag
+		} else if argCount > 0 {
+			argCount-- // Still typing the current argument
+		}
+	}
+
+	// Suggest flags if we're typing a flag
+	if strings.HasPrefix(lastArg, "-") {
 		return []prompt.Suggest{
 			{Text: "-t", Description: "Set temperature (0.0-1.0)"},
 			{Text: "-m", Description: "Set max tokens"},
 		}
+	}
+
+	// Suggest agent UUID if we haven't specified one yet
+	if argCount == 0 {
+		agents, err := client.ListAgents()
+		if err != nil {
+			return []prompt.Suggest{
+				{Text: "", Description: "Enter agent UUID"},
+			}
+		}
+
+		var suggests []prompt.Suggest
+		currentWord := d.GetWordBeforeCursor()
+		for _, agent := range agents {
+			if strings.HasPrefix(strings.ToLower(agent.UUID), strings.ToLower(currentWord)) ||
+				strings.HasPrefix(strings.ToLower(agent.Title), strings.ToLower(currentWord)) {
+				suggests = append(suggests, prompt.Suggest{
+					Text:        agent.UUID,
+					Description: agent.Title,
+				})
+			}
+		}
+		return suggests
 	}
 
 	return []prompt.Suggest{}

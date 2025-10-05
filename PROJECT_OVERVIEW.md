@@ -32,9 +32,11 @@ The project is structured as follows:
   - `rm` - Remove nodes (files and folders)
   - `mv` - Move nodes between locations
   - `rename` - Rename files and folders
+  - `cp` - Copy nodes to different locations
+  - `duplicate` - Duplicate nodes in the same location
 
 - **File Transfer Operations:**
-  - `cp` - Upload local files to Antbox folders
+  - `upload` - Upload local files to Antbox folders
   - `get` - Download Antbox nodes to local Downloads folder
 
 - **Node Information:**
@@ -80,11 +82,20 @@ Once connected, you can use familiar commands:
 - `rm node-uuid` - Delete files and folders
 - `mv source-uuid destination-uuid` - Move nodes
 - `rename node-uuid "new name"` - Rename nodes
+- `cp source-uuid destination-uuid` - Copy nodes to different locations
+- `duplicate node-uuid` - Duplicate nodes in the same location
 - `run action-uuid node-uuid param=value` - Execute actions on nodes
 - `call extension-uuid param=value` - Execute extensions
 - `template template-uuid` - Download templates
 
 All commands support intelligent auto-completion with suggestions appearing after typing 2+ characters.
+
+## Enhanced Auto-completion Features
+
+- **Smart Action/Extension Discovery**: `run` and `call` commands dynamically list available actions and extensions
+- **Agent Suggestions**: `chat` and `answer` commands suggest available AI agents
+- **Node UUID Completion**: Most commands provide filtered node suggestions based on context
+- **Folder-Only Filtering**: Navigation commands like `cd` and `cp` only suggest appropriate folder targets
 
 ## Architecture Highlights
 

@@ -70,10 +70,8 @@ func (c *FindCommand) Execute(args []string) {
 		filters = filterList
 	}
 
-	fmt.Printf("Debug: Sending filters to API: %+v\n", filters)
 	result, err := client.FindNodes(filters, 20, 1)
 	if err != nil {
-		fmt.Printf("Debug: API Error: %+v\n", err)
 		fmt.Println("Error:", err)
 		return
 	}

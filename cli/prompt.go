@@ -36,6 +36,8 @@ import (
 // - run <action_uuid> <node_uuid> [param=value...]: Run an action on a node with optional parameters
 // - call <extension_uuid> [param=value...]: Run an extension with optional parameters
 // - template <uuid>: Download a template to Downloads folder
+// - cp <source_uuid> <destination_uuid> [new_title]: Copy a node to another location
+// - duplicate <uuid>: Duplicate a node in the same location
 
 var (
 	client            antbox.Antbox
