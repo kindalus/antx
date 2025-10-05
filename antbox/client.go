@@ -606,12 +606,12 @@ func (c *client) GetBreadcrumbs(uuid string) ([]Node, error) {
 	return breadcrumbs, nil
 }
 
-func (c *client) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int) (string, error) {
+func (c *client) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]interface{}) (string, error) {
 	options := make(map[string]interface{})
 
-	if conversationID != "" {
-		// Add conversation history if we have a conversationID
-		options["history"] = []map[string]interface{}{}
+	if conversationID != "" && len(history) > 0 {
+		// Add conversation history if we have a conversationID and history
+		options["history"] = history
 	}
 	if temperature != nil {
 		options["temperature"] = *temperature
@@ -652,21 +652,49 @@ func (c *client) ChatWithAgent(agentUUID string, message string, conversationID 
 		return "", NewHttpErrorWithRequestBody(resp, req, string(jsonData))
 	}
 
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	// Try to decode as array first (conversation history format)
+	var arrayResult []map[string]interface{}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return "", err
 	}
 
-	// Extract the response message
-	if response, ok := result["response"]; ok {
-		if responseStr, ok := response.(string); ok {
-			return responseStr, nil
+	if err := json.Unmarshal(body, &arrayResult); err == nil {
+		// Response is an array of conversation messages
+		// Find the last model response
+		for i := len(arrayResult) - 1; i >= 0; i-- {
+			message := arrayResult[i]
+			if role, ok := message["role"].(string); ok && role == "model" {
+				if parts, ok := message["parts"].([]interface{}); ok && len(parts) > 0 {
+					if part, ok := parts[0].(map[string]interface{}); ok {
+						if text, ok := part["text"].(string); ok {
+							return text, nil
+						}
+					}
+				}
+			}
 		}
+		// If no model response found, return the whole array as JSON
+		responseJson, _ := json.MarshalIndent(arrayResult, "", "  ")
+		return string(responseJson), nil
 	}
 
-	// Fallback to return the whole response as JSON string
-	responseJson, _ := json.MarshalIndent(result, "", "  ")
-	return string(responseJson), nil
+	// Try to decode as object (traditional format)
+	var objectResult map[string]interface{}
+	if err := json.Unmarshal(body, &objectResult); err == nil {
+		// Extract the response message
+		if response, ok := objectResult["response"]; ok {
+			if responseStr, ok := response.(string); ok {
+				return responseStr, nil
+			}
+		}
+		// Fallback to return the whole response as JSON string
+		responseJson, _ := json.MarshalIndent(objectResult, "", "  ")
+		return string(responseJson), nil
+	}
+
+	// If neither format works, return the raw response
+	return string(body), nil
 }
 
 func (c *client) AnswerFromAgent(agentUUID string, query string, temperature *float64, maxTokens *int) (string, error) {
@@ -728,18 +756,16 @@ func (c *client) AnswerFromAgent(agentUUID string, query string, temperature *fl
 	return string(responseJson), nil
 }
 
-func (c *client) RagChat(message string, conversationID string, filters map[string]interface{}) (string, error) {
+func (c *client) RagChat(message string, conversationID string, filters map[string]interface{}, history []map[string]interface{}) (string, error) {
 	options := make(map[string]interface{})
 
-	if conversationID != "" {
-		// Add conversation history if we have a conversationID
-		options["history"] = []map[string]interface{}{}
+	if conversationID != "" && len(history) > 0 {
+		// Add conversation history if we have a conversationID and history
+		options["history"] = history
 	}
-	if filters != nil {
-		// Add parent or other filter options
-		for k, v := range filters {
-			options[k] = v
-		}
+	// Add parent or other filter options
+	for k, v := range filters {
+		options[k] = v
 	}
 
 	payload := map[string]interface{}{
@@ -773,21 +799,49 @@ func (c *client) RagChat(message string, conversationID string, filters map[stri
 		return "", NewHttpErrorWithRequestBody(resp, req, string(jsonData))
 	}
 
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	// Try to decode as array first (conversation history format)
+	var arrayResult []map[string]interface{}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return "", err
 	}
 
-	// Extract the response message
-	if response, ok := result["response"]; ok {
-		if responseStr, ok := response.(string); ok {
-			return responseStr, nil
+	if err := json.Unmarshal(body, &arrayResult); err == nil {
+		// Response is an array of conversation messages
+		// Find the last model response
+		for i := len(arrayResult) - 1; i >= 0; i-- {
+			message := arrayResult[i]
+			if role, ok := message["role"].(string); ok && role == "model" {
+				if parts, ok := message["parts"].([]interface{}); ok && len(parts) > 0 {
+					if part, ok := parts[0].(map[string]interface{}); ok {
+						if text, ok := part["text"].(string); ok {
+							return text, nil
+						}
+					}
+				}
+			}
 		}
+		// If no model response found, return the whole array as JSON
+		responseJson, _ := json.MarshalIndent(arrayResult, "", "  ")
+		return string(responseJson), nil
 	}
 
-	// Fallback to return the whole response as JSON string
-	responseJson, _ := json.MarshalIndent(result, "", "  ")
-	return string(responseJson), nil
+	// Try to decode as object (traditional format)
+	var objectResult map[string]interface{}
+	if err := json.Unmarshal(body, &objectResult); err == nil {
+		// Extract the response message
+		if response, ok := objectResult["response"]; ok {
+			if responseStr, ok := response.(string); ok {
+				return responseStr, nil
+			}
+		}
+		// Fallback to return the whole response as JSON string
+		responseJson, _ := json.MarshalIndent(objectResult, "", "  ")
+		return string(responseJson), nil
+	}
+
+	// If neither format works, return the raw response
+	return string(body), nil
 }
 
 func (c *client) CopyNode(uuid, parent, title string) (*Node, error) {

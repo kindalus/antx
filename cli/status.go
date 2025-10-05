@@ -46,6 +46,42 @@ func (c *StatusCommand) Execute(args []string) {
 	total := len(aspects) + len(actions) + len(extensions) + len(agents)
 	fmt.Printf("Total resources: %d\n", total)
 
+	// Show conversation session statistics
+	sessionCount := GetActiveSessionCount()
+	fmt.Println()
+	fmt.Println("Conversation Sessions:")
+	fmt.Println("========================================")
+	fmt.Printf("  Active sessions: %d\n", sessionCount)
+
+	if sessionCount > 0 {
+		sessions := ListActiveSessions()
+		totalMessages := 0
+		for _, sessionID := range sessions {
+			session := GetOrCreateSession(sessionID)
+			totalMessages += len(session.GetHistory())
+		}
+		fmt.Printf("  Total messages:  %d\n", totalMessages)
+
+		fmt.Println()
+		fmt.Println("  Recent sessions:")
+		displayCount := sessionCount
+		if displayCount > 5 {
+			displayCount = 5
+		}
+		for i := 0; i < displayCount; i++ {
+			sessionID := sessions[i]
+			session := GetOrCreateSession(sessionID)
+			messageCount := len(session.GetHistory())
+			fmt.Printf("    %s (%d messages)\n", sessionID, messageCount)
+		}
+		if sessionCount > 5 {
+			fmt.Printf("    ... and %d more (use 'sessions list' to see all)\n", sessionCount-5)
+		}
+	} else {
+		fmt.Println("  No active conversation sessions")
+		fmt.Println("  Start a conversation using 'chat' or 'rag' with -c <session_id>")
+	}
+
 	if total == 0 {
 		fmt.Println()
 		fmt.Println("Note: No resources loaded. This might indicate:")

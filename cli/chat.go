@@ -98,10 +98,35 @@ parseComplete:
 
 	message := strings.Join(messageArgs, " ")
 
-	response, err := client.ChatWithAgent(agentUUID, message, conversationID, temperature, maxTokens)
+	// Get or create session if conversation ID is provided
+	var session *Session
+	if conversationID != "" {
+		session = GetOrCreateSession(conversationID)
+
+		// Add user message to session history
+		session.AddMessage("user", message)
+	}
+
+	// Get conversation history if this is a continuing conversation
+	var history []map[string]interface{}
+	if session != nil && !session.IsEmpty() {
+		// For subsequent messages, include history (excluding the current user message we just added)
+		allHistory := session.GetHistoryAsMap()
+		if len(allHistory) > 1 {
+			// Exclude the last message (current user message) from history sent to API
+			history = allHistory[:len(allHistory)-1]
+		}
+	}
+
+	response, err := client.ChatWithAgent(agentUUID, message, conversationID, temperature, maxTokens, history)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
+	}
+
+	// Add assistant response to session history
+	if session != nil {
+		session.AddMessage("assistant", response)
 	}
 
 	fmt.Println(response)

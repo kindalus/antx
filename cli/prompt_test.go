@@ -88,7 +88,7 @@ func (c *mockClient) GetBreadcrumbs(uuid string) ([]antbox.Node, error) {
 	}, nil
 }
 
-func (c *mockClient) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int) (string, error) {
+func (c *mockClient) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]interface{}) (string, error) {
 	return "Mock chat response", nil
 }
 
@@ -96,8 +96,8 @@ func (c *mockClient) AnswerFromAgent(agentUUID string, query string, temperature
 	return "Mock answer response", nil
 }
 
-func (c *mockClient) RagChat(message string, conversationID string, filters map[string]interface{}) (string, error) {
-	return "Mock RAG response", nil
+func (c *mockClient) RagChat(message string, conversationID string, filters map[string]interface{}, history []map[string]interface{}) (string, error) {
+	return "Mock rag response", nil
 }
 
 // New interface methods
@@ -438,11 +438,11 @@ func TestCompleterNewCommands(t *testing.T) {
 		t.Errorf("Expected 0 suggestions for cp file path, got %d", len(suggests))
 	}
 
-	// Test cp command - cp is not implemented, should get 0 suggestions
+	// Test cp command - cp is implemented, should get folder suggestions only
 	doc = createTestDocument("cp /path/to/file te")
 	suggests = completer(doc)
-	if len(suggests) != 0 {
-		t.Errorf("Expected 0 suggestions for cp command, got %d", len(suggests))
+	if len(suggests) != 1 {
+		t.Errorf("Expected 1 suggestion for cp command (folders only), got %d", len(suggests))
 	}
 
 	// Test stat command suggestions (should suggest all nodes)
@@ -477,9 +477,9 @@ func TestCommandSuggestions(t *testing.T) {
 		{"ex", []string{"exit"}},
 		{"he", []string{"help"}},
 		{"pw", []string{"pwd"}},
-		{"st", []string{"stat"}},
+		{"st", []string{"stat", "status"}},
 		{"fi", []string{"find"}},
-		{"re", []string{"rename"}},
+		{"re", []string{"reload", "rename"}},
 		{"ch", []string{"chat"}},
 		{"an", []string{"answer"}},
 		{"ra", []string{"rag"}},
@@ -520,9 +520,9 @@ func TestCommandSuggestionsMinLength(t *testing.T) {
 		expected int
 	}{
 		{"l", 1}, // should match "ls"
-		{"r", 3}, // should match "rm", "rename", "rag"
+		{"r", 5}, // should match "rm", "rename", "rag", "reload", "run"
 		{"m", 3}, // should match "mkdir", "mv", "mksmart"
-		{"c", 2}, // should match "cd", "chat"
+		{"c", 4}, // should match "cd", "chat", "call", "cp"
 		{"h", 1}, // should match "help"
 	}
 
@@ -919,7 +919,7 @@ func (c *enhancedMockClient) GetBreadcrumbs(uuid string) ([]antbox.Node, error) 
 	}, nil
 }
 
-func (c *enhancedMockClient) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int) (string, error) {
+func (c *enhancedMockClient) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]interface{}) (string, error) {
 	return "Mock chat response", nil
 }
 
@@ -927,8 +927,8 @@ func (c *enhancedMockClient) AnswerFromAgent(agentUUID string, query string, tem
 	return "Mock answer response", nil
 }
 
-func (c *enhancedMockClient) RagChat(message string, conversationID string, filters map[string]interface{}) (string, error) {
-	return "Mock RAG response", nil
+func (c *enhancedMockClient) RagChat(message string, conversationID string, filters map[string]interface{}, history []map[string]interface{}) (string, error) {
+	return "Mock rag response", nil
 }
 
 // New interface methods

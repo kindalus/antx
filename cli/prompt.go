@@ -29,8 +29,10 @@ import (
 // - pwd: Show current path using breadcrumbs
 // - rag [options] <message>: RAG chat with optional filters and conversation context
 //   Options: -l (location context), -c <conversation_id>, -f <field>=<value>
+//   Sessions: Use -c <session_id> to maintain conversation history across messages
 // - chat [options] <agent_uuid> <message>: Chat with specific agent
 //   Options: -t <temperature>, -m <max_tokens>, -c <conversation_id>
+//   Sessions: Use -c <session_id> to maintain conversation history across messages
 // - answer [options] <agent_uuid> <question>: Ask question to specific agent
 //   Options: -t <temperature>, -m <max_tokens>
 // - run <action_uuid> <node_uuid> [param=value...]: Run an action on a node with optional parameters
@@ -38,8 +40,9 @@ import (
 // - template <uuid>: Download a template to Downloads folder
 // - cp <source_uuid> <destination_uuid> [new_title]: Copy a node to another location
 // - duplicate <uuid>: Duplicate a node in the same location
+// - sessions <subcommand>: Manage conversation sessions (list, show, clear, remove)
 // - reload: Reload cached data from server (aspects, actions, extensions, agents)
-// - status: Show cached data statistics
+// - status: Show cached data statistics and active conversation sessions
 
 var (
 	client            antbox.Antbox

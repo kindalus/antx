@@ -52,9 +52,9 @@ type Antbox interface {
 	CreateAgent(agent AgentCreate) (*Agent, error)
 	GetAgent(uuid string) (*Agent, error)
 	DeleteAgent(uuid string) error
-	ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int) (string, error)
+	ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]interface{}) (string, error)
 	AnswerFromAgent(agentUUID string, query string, temperature *float64, maxTokens *int) (string, error)
-	RagChat(message string, conversationID string, filters map[string]interface{}) (string, error)
+	RagChat(message string, conversationID string, filters map[string]interface{}, history []map[string]interface{}) (string, error)
 
 	// API Key operations
 	ListAPIKeys() ([]APIKey, error)

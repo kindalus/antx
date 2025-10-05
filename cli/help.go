@@ -60,6 +60,7 @@ func (c *HelpCommand) Execute(args []string) {
 		"Folder Management":     {"mkdir", "mksmart"},
 		"Actions & Extensions":  {"run", "call"},
 		"AI & Agents":           {"chat", "answer", "rag"},
+		"Session Management":    {"sessions"},
 		"Templates":             {"template"},
 		"System Management":     {"reload", "status", "help", "exit"},
 	}
@@ -71,6 +72,7 @@ func (c *HelpCommand) Execute(args []string) {
 		"Folder Management",
 		"Actions & Extensions",
 		"AI & Agents",
+		"Session Management",
 		"Templates",
 		"System Management",
 	} {
