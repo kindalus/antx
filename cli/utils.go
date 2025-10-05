@@ -56,13 +56,60 @@ func convertValue(valueStr string) any {
 
 // normalizeOperators adds spaces around operators in query strings
 func normalizeOperators(input string) string {
+	// Process longer operators first to avoid substring replacement issues
 	operators := []string{"==", ">=", "<=", "!=", "~=", ">", "<"}
 
 	result := input
 	for _, op := range operators {
-		// Replace operator without spaces with operator with spaces
-		spaced := " " + op + " "
-		result = strings.ReplaceAll(result, op, spaced)
+		// Only replace operators that are not part of larger operators
+		// by checking that they are either at boundaries or surrounded by non-operator chars
+		var newResult strings.Builder
+		i := 0
+		for i < len(result) {
+			if i <= len(result)-len(op) && result[i:i+len(op)] == op {
+				// Found the operator, check if it's part of a larger operator
+				isPartOfLarger := false
+
+				// Check if this operator is part of a longer operator
+				for _, longerOp := range operators {
+					if len(longerOp) > len(op) {
+						// Check if the current position is within a longer operator
+						for j := max(0, i-len(longerOp)+len(op)); j <= min(i, len(result)-len(longerOp)); j++ {
+							if j+len(longerOp) <= len(result) && result[j:j+len(longerOp)] == longerOp {
+								if j <= i && i+len(op) <= j+len(longerOp) {
+									isPartOfLarger = true
+									break
+								}
+							}
+						}
+						if isPartOfLarger {
+							break
+						}
+					}
+				}
+
+				if !isPartOfLarger {
+					// Check if already properly spaced
+					hasSpaceBefore := i == 0 || result[i-1] == ' '
+					hasSpaceAfter := i+len(op) >= len(result) || result[i+len(op)] == ' '
+
+					if !hasSpaceBefore {
+						newResult.WriteString(" ")
+					}
+					newResult.WriteString(op)
+					if !hasSpaceAfter {
+						newResult.WriteString(" ")
+					}
+				} else {
+					newResult.WriteString(op)
+				}
+				i += len(op)
+			} else {
+				newResult.WriteByte(result[i])
+				i++
+			}
+		}
+		result = newResult.String()
 	}
 
 	// Clean up multiple spaces
@@ -71,6 +118,20 @@ func normalizeOperators(input string) string {
 	}
 
 	return strings.TrimSpace(result)
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // mksmart creates a smart folder with the given arguments

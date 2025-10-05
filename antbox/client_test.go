@@ -23,7 +23,7 @@ func TestLogin(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "", "test-password", "")
+	client := NewClient(server.URL, "", "test-password", "", false)
 	if err := client.Login(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestGetNode(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "", "", "test-jwt")
+	client := NewClient(server.URL, "", "", "test-jwt", false)
 	node, err := client.GetNode("test-uuid")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -66,11 +66,11 @@ func TestListNodes(t *testing.T) {
 			t.Errorf("Expected 'GET' request, got '%s'", r.Method)
 		}
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `[{"uuid":"test-uuid","title":"test-title"}]`)
+		fmt.Fprintln(w, `{"nodes":[{"uuid":"test-uuid","title":"test-title"}],"total":1}`)
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "", "", "test-jwt")
+	client := NewClient(server.URL, "", "", "test-jwt", false)
 	nodes, err := client.ListNodes("--root--")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -93,7 +93,7 @@ func TestHttpError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "", "", "test-jwt")
+	client := NewClient(server.URL, "", "", "test-jwt", false)
 	_, err := client.GetNode("non-existent-uuid")
 
 	if err == nil {
@@ -155,7 +155,7 @@ func TestHttpErrorJSONPrettyPrint(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "", "", "test-jwt")
+	client := NewClient(server.URL, "", "", "test-jwt", false)
 	_, err := client.GetNode("invalid-uuid")
 
 	httpErr, ok := err.(*HttpError)
@@ -210,7 +210,7 @@ func TestHttpErrorWithRequestBody(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "", "", "test-jwt")
+	client := NewClient(server.URL, "", "", "test-jwt", false)
 	_, err := client.CreateFolder("parent-uuid", "invalid/name")
 
 	httpErr, ok := err.(*HttpError)
@@ -268,7 +268,7 @@ func TestHttpErrorNonJSON(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "", "", "test-jwt")
+	client := NewClient(server.URL, "", "", "test-jwt", false)
 	_, err := client.GetNode("invalid-uuid")
 
 	httpErr, ok := err.(*HttpError)
@@ -308,7 +308,7 @@ func TestRemoveNode(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "", "", "test-jwt")
+	client := NewClient(server.URL, "", "", "test-jwt", false)
 	err := client.RemoveNode("test-uuid")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -327,7 +327,7 @@ func TestMoveNode(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "", "", "test-jwt")
+	client := NewClient(server.URL, "", "", "test-jwt", false)
 	err := client.MoveNode("test-uuid", "parent-uuid")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -346,7 +346,7 @@ func TestChangeNodeName(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "", "", "test-jwt")
+	client := NewClient(server.URL, "", "", "test-jwt", false)
 	err := client.ChangeNodeName("test-uuid", "new-name")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -369,8 +369,8 @@ func TestUploadFile(t *testing.T) {
 	tempFile.Close()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/nodes" {
-			t.Errorf("Expected to request '/nodes', got %s", r.URL.Path)
+		if r.URL.Path != "/nodes/-/upload" {
+			t.Errorf("Expected to request '/nodes/-/upload', got %s", r.URL.Path)
 		}
 		if r.Method != "POST" {
 			t.Errorf("Expected 'POST' request, got '%s'", r.Method)
@@ -383,7 +383,7 @@ func TestUploadFile(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL, "", "", "test-jwt")
+	client := NewClient(server.URL, "", "", "test-jwt", false)
 	node, err := client.CreateFile(tempFile.Name(), "parent-uuid")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -396,8 +396,8 @@ func TestUploadFile(t *testing.T) {
 func TestDownloadNode(t *testing.T) {
 	testContent := "This is downloaded content"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/nodes/test-uuid/content" {
-			t.Errorf("Expected to request '/nodes/test-uuid/content', got %s", r.URL.Path)
+		if r.URL.Path != "/nodes/test-uuid/-/export" {
+			t.Errorf("Expected to request '/nodes/test-uuid/-/export', got %s", r.URL.Path)
 		}
 		if r.Method != "GET" {
 			t.Errorf("Expected 'GET' request, got '%s'", r.Method)
@@ -416,7 +416,7 @@ func TestDownloadNode(t *testing.T) {
 
 	downloadPath := filepath.Join(tempDir, "downloaded-file.txt")
 
-	client := NewClient(server.URL, "", "", "test-jwt")
+	client := NewClient(server.URL, "", "", "test-jwt", false)
 	err = client.DownloadNode("test-uuid", downloadPath)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)

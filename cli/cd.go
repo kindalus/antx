@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	"github.com/c-bata/go-prompt"
+	prompt "github.com/c-bata/go-prompt"
 )
 
 type CdCommand struct{}

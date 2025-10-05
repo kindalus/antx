@@ -59,6 +59,180 @@ type NodeFilterResult struct {
 	PageToken int    `json:"pageToken"`
 }
 
+// Feature represents a feature in the system
+type Feature struct {
+	UUID              string       `json:"uuid,omitempty"`
+	Fid               string       `json:"fid,omitempty"`
+	Title             string       `json:"title,omitempty"`
+	Name              string       `json:"name,omitempty"`
+	Description       string       `json:"description,omitempty"`
+	Mimetype          string       `json:"mimetype,omitempty"`
+	Parent            string       `json:"parent,omitempty"`
+	Owner             string       `json:"owner,omitempty"`
+	Group             string       `json:"group,omitempty"`
+	ExposeAsAction    bool         `json:"exposeAsAction,omitempty"`
+	ExposeAsExtension bool         `json:"exposeAsExtension,omitempty"`
+	Parameters        []Parameter  `json:"parameters,omitempty"`
+	ReturnType        string       `json:"returnType,omitempty"`
+	ReturnDescription string       `json:"returnDescription,omitempty"`
+	Permissions       *Permissions `json:"permissions,omitempty"`
+	CreatedAt         string       `json:"createdAt,omitempty"`
+	ModifiedAt        string       `json:"modifiedAt,omitempty"`
+}
+
+// Parameter represents a feature parameter
+type Parameter struct {
+	Name         string      `json:"name,omitempty"`
+	Type         string      `json:"type,omitempty"`
+	Description  string      `json:"description,omitempty"`
+	Required     bool        `json:"required,omitempty"`
+	DefaultValue interface{} `json:"defaultValue,omitempty"`
+}
+
+// ActionRunRequest represents a request to run an action
+type ActionRunRequest struct {
+	UUIDs      []string               `json:"uuids"`
+	Parameters map[string]interface{} `json:"parameters,omitempty"`
+}
+
+// Agent represents an AI agent
+type Agent struct {
+	UUID               string `json:"uuid,omitempty"`
+	SystemInstructions string `json:"systemInstructions,omitempty"`
+	Title              string `json:"title,omitempty"`
+	Description        string `json:"description,omitempty"`
+	Model              string `json:"model,omitempty"`
+	Owner              string `json:"owner,omitempty"`
+	Group              string `json:"group,omitempty"`
+	CreatedAt          string `json:"createdAt,omitempty"`
+	ModifiedAt         string `json:"modifiedAt,omitempty"`
+}
+
+// AgentCreate represents the request to create an agent
+type AgentCreate struct {
+	SystemInstructions string `json:"systemInstructions"`
+	Title              string `json:"title"`
+	Description        string `json:"description,omitempty"`
+	Model              string `json:"model,omitempty"`
+}
+
+// AgentChatRequest represents a chat request to an agent
+type AgentChatRequest struct {
+	Text    string                 `json:"text"`
+	Options map[string]interface{} `json:"options,omitempty"`
+}
+
+// AgentAnswerRequest represents an answer request to an agent
+type AgentAnswerRequest struct {
+	Text    string                 `json:"text"`
+	Options map[string]interface{} `json:"options,omitempty"`
+}
+
+// RagChatRequest represents a RAG chat request
+type RagChatRequest struct {
+	Text    string                 `json:"text"`
+	Options map[string]interface{} `json:"options,omitempty"`
+}
+
+// APIKey represents an API key
+type APIKey struct {
+	UUID        string `json:"uuid,omitempty"`
+	Key         string `json:"key,omitempty"`
+	Group       string `json:"group,omitempty"`
+	Description string `json:"description,omitempty"`
+	CreatedAt   string `json:"createdAt,omitempty"`
+	CreatedBy   string `json:"createdBy,omitempty"`
+}
+
+// APIKeyCreate represents the request to create an API key
+type APIKeyCreate struct {
+	Group       string `json:"group"`
+	Description string `json:"description,omitempty"`
+}
+
+// User represents a user account
+type User struct {
+	UUID      string `json:"uuid,omitempty"`
+	Email     string `json:"email,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Group     string `json:"group,omitempty"`
+	Role      string `json:"role,omitempty"`
+	Active    bool   `json:"active,omitempty"`
+	CreatedAt string `json:"createdAt,omitempty"`
+}
+
+// UserCreate represents the request to create a user
+type UserCreate struct {
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Password string `json:"password"`
+	Group    string `json:"group,omitempty"`
+	Role     string `json:"role,omitempty"`
+}
+
+// UserUpdate represents the request to update a user
+type UserUpdate struct {
+	Name     string `json:"name,omitempty"`
+	Password string `json:"password,omitempty"`
+	Group    string `json:"group,omitempty"`
+	Role     string `json:"role,omitempty"`
+	Active   *bool  `json:"active,omitempty"`
+}
+
+// Group represents a group
+type Group struct {
+	UUID        string `json:"uuid,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	CreatedAt   string `json:"createdAt,omitempty"`
+	ModifiedAt  string `json:"modifiedAt,omitempty"`
+}
+
+// GroupCreate represents the request to create a group
+type GroupCreate struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+}
+
+// GroupUpdate represents the request to update a group
+type GroupUpdate struct {
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+// Template represents a template
+type Template struct {
+	UUID     string `json:"uuid,omitempty"`
+	Mimetype string `json:"mimetype,omitempty"`
+	Size     int    `json:"size,omitempty"`
+}
+
+// Aspect represents an aspect
+type Aspect struct {
+	UUID        string       `json:"uuid,omitempty"`
+	Title       string       `json:"title,omitempty"`
+	Name        string       `json:"name,omitempty"`
+	Description string       `json:"description,omitempty"`
+	Mimetype    string       `json:"mimetype,omitempty"`
+	Owner       string       `json:"owner,omitempty"`
+	Permissions *Permissions `json:"permissions,omitempty"`
+}
+
+// AspectCreate represents the request to create an aspect
+type AspectCreate struct {
+	Title       string       `json:"title"`
+	Name        string       `json:"name"`
+	Description string       `json:"description,omitempty"`
+	Mimetype    string       `json:"mimetype,omitempty"`
+	Permissions *Permissions `json:"permissions,omitempty"`
+}
+
+// Breadcrumb represents a breadcrumb item
+type Breadcrumb struct {
+	UUID  string `json:"uuid"`
+	Title string `json:"title"`
+}
+
 type HttpError struct {
 	StatusCode      int
 	Status          string
