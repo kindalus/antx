@@ -152,13 +152,8 @@ func (c *ChatCommand) Suggest(d prompt.Document) []prompt.Suggest {
 
 	// Suggest agent UUID if we haven't specified one yet
 	if argCount == 0 {
-		agents, err := client.ListAgents()
-		if err != nil {
-			return []prompt.Suggest{
-				{Text: "", Description: "Enter agent UUID"},
-			}
-		}
-
+		// Use cached agents
+		agents := GetCachedAgents()
 		var suggests []prompt.Suggest
 		currentWord := d.GetWordBeforeCursor()
 		for _, agent := range agents {

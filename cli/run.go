@@ -99,15 +99,8 @@ func (c *RunCommand) Suggest(d prompt.Document) []prompt.Suggest {
 
 	switch argCount {
 	case 0:
-		// Suggesting action UUID - list available actions
-		actions, err := client.ListActions()
-		if err != nil {
-			// Fallback to generic suggestion if API call fails
-			return []prompt.Suggest{
-				{Text: "", Description: "Enter action UUID"},
-			}
-		}
-
+		// Suggesting action UUID - use cached actions
+		actions := GetCachedActions()
 		var suggests []prompt.Suggest
 		currentWord := d.GetWordBeforeCursor()
 		for _, action := range actions {

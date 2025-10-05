@@ -87,13 +87,16 @@ Once connected, you can use familiar commands:
 - `run action-uuid node-uuid param=value` - Execute actions on nodes
 - `call extension-uuid param=value` - Execute extensions
 - `template template-uuid` - Download templates
+- `reload` - Refresh cached data from server
+- `status` - Show cached data statistics
 
 All commands support intelligent auto-completion with suggestions appearing after typing 2+ characters.
 
 ## Enhanced Auto-completion Features
 
-- **Smart Action/Extension Discovery**: `run` and `call` commands dynamically list available actions and extensions
-- **Agent Suggestions**: `chat` and `answer` commands suggest available AI agents
+- **Cached Resource Discovery**: At startup, the CLI loads and caches lists of aspects, actions, extensions, and agents for instant suggestions
+- **Fast Suggestions**: `run`, `call`, `chat`, and `answer` commands use cached data for near-instant auto-completion
+- **Live Refresh**: Use `reload` command to update cached data when server resources change
 - **Node UUID Completion**: Most commands provide filtered node suggestions based on context
 - **Folder-Only Filtering**: Navigation commands like `cd` and `cp` only suggest appropriate folder targets
 
@@ -101,6 +104,9 @@ All commands support intelligent auto-completion with suggestions appearing afte
 
 - **HTTP Client with Advanced Error Handling:**
   Custom `HttpError` type that captures complete request/response details for debugging
+
+- **Intelligent Resource Caching:**
+  Startup loading of aspects, actions, extensions, and agents for fast auto-completion without API delays
 
 - **Smart Command Completion:**
   Context-aware suggestions that understand command requirements (e.g., folders-only for `cd`)

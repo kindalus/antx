@@ -90,15 +90,8 @@ func (c *CallCommand) Suggest(d prompt.Document) []prompt.Suggest {
 
 	switch argCount {
 	case 0:
-		// Suggesting extension UUID - list available extensions
-		extensions, err := client.ListExtensions()
-		if err != nil {
-			// Fallback to generic suggestion if API call fails
-			return []prompt.Suggest{
-				{Text: "", Description: "Enter extension UUID"},
-			}
-		}
-
+		// Suggesting extension UUID - use cached extensions
+		extensions := GetCachedExtensions()
 		var suggests []prompt.Suggest
 		currentWord := d.GetWordBeforeCursor()
 		for _, extension := range extensions {

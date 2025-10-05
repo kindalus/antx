@@ -38,12 +38,20 @@ import (
 // - template <uuid>: Download a template to Downloads folder
 // - cp <source_uuid> <destination_uuid> [new_title]: Copy a node to another location
 // - duplicate <uuid>: Duplicate a node in the same location
+// - reload: Reload cached data from server (aspects, actions, extensions, agents)
+// - status: Show cached data statistics
 
 var (
 	client            antbox.Antbox
 	currentFolder     = "--root--"
 	currentFolderName = "root"
 	currentNodes      []antbox.Node
+
+	// Cached data loaded at startup
+	cachedAspects    []antbox.Aspect
+	cachedActions    []antbox.Feature
+	cachedExtensions []antbox.Feature
+	cachedAgents     []antbox.Agent
 )
 
 func executor(in string) {
@@ -130,6 +138,9 @@ func Start(serverURL, apiKey, root, jwt string, debug bool) {
 		}
 	}
 
+	// Load cached data at startup
+	loadCachedData()
+
 	// Initial ls
 	if cmd, ok := commands["ls"]; ok {
 		cmd.Execute([]string{})
@@ -159,4 +170,134 @@ func Start(serverURL, apiKey, root, jwt string, debug bool) {
 		}),
 	)
 	p.Run()
+}
+
+// loadCachedData loads aspects, actions, extensions, and agents at startup
+func loadCachedData() {
+	fmt.Print("Loading available resources... ")
+
+	var loaded []string
+	var failed []string
+
+	// Load aspects
+	if aspects, err := client.ListAspects(); err == nil {
+		cachedAspects = aspects
+		loaded = append(loaded, fmt.Sprintf("%d aspects", len(aspects)))
+	} else {
+		failed = append(failed, "aspects")
+	}
+
+	// Load actions
+	if actions, err := client.ListActions(); err == nil {
+		cachedActions = actions
+		loaded = append(loaded, fmt.Sprintf("%d actions", len(actions)))
+	} else {
+		failed = append(failed, "actions")
+	}
+
+	// Load extensions
+	if extensions, err := client.ListExtensions(); err == nil {
+		cachedExtensions = extensions
+		loaded = append(loaded, fmt.Sprintf("%d extensions", len(extensions)))
+	} else {
+		failed = append(failed, "extensions")
+	}
+
+	// Load agents
+	if agents, err := client.ListAgents(); err == nil {
+		cachedAgents = agents
+		loaded = append(loaded, fmt.Sprintf("%d agents", len(agents)))
+	} else {
+		failed = append(failed, "agents")
+	}
+
+	if len(failed) == 0 {
+		fmt.Printf("done (%s)\n", strings.Join(loaded, ", "))
+	} else {
+		fmt.Printf("done with warnings\n")
+		if len(loaded) > 0 {
+			fmt.Printf("  Loaded: %s\n", strings.Join(loaded, ", "))
+		}
+		fmt.Printf("  Failed: %s\n", strings.Join(failed, ", "))
+	}
+}
+
+// reloadCachedData reloads all cached data from the server
+func reloadCachedData() error {
+	fmt.Print("Reloading resources from server... ")
+
+	var loaded []string
+	var failed []string
+	var errors []string
+
+	// Reload aspects
+	if aspects, err := client.ListAspects(); err == nil {
+		cachedAspects = aspects
+		loaded = append(loaded, fmt.Sprintf("%d aspects", len(aspects)))
+	} else {
+		failed = append(failed, "aspects")
+		errors = append(errors, fmt.Sprintf("aspects: %v", err))
+	}
+
+	// Reload actions
+	if actions, err := client.ListActions(); err == nil {
+		cachedActions = actions
+		loaded = append(loaded, fmt.Sprintf("%d actions", len(actions)))
+	} else {
+		failed = append(failed, "actions")
+		errors = append(errors, fmt.Sprintf("actions: %v", err))
+	}
+
+	// Reload extensions
+	if extensions, err := client.ListExtensions(); err == nil {
+		cachedExtensions = extensions
+		loaded = append(loaded, fmt.Sprintf("%d extensions", len(extensions)))
+	} else {
+		failed = append(failed, "extensions")
+		errors = append(errors, fmt.Sprintf("extensions: %v", err))
+	}
+
+	// Reload agents
+	if agents, err := client.ListAgents(); err == nil {
+		cachedAgents = agents
+		loaded = append(loaded, fmt.Sprintf("%d agents", len(agents)))
+	} else {
+		failed = append(failed, "agents")
+		errors = append(errors, fmt.Sprintf("agents: %v", err))
+	}
+
+	if len(failed) == 0 {
+		fmt.Printf("done (%s)\n", strings.Join(loaded, ", "))
+		return nil
+	} else {
+		fmt.Printf("done with errors\n")
+		if len(loaded) > 0 {
+			fmt.Printf("  Successfully loaded: %s\n", strings.Join(loaded, ", "))
+		}
+		fmt.Printf("  Failed to load: %s\n", strings.Join(failed, ", "))
+		for _, errMsg := range errors {
+			fmt.Printf("    %s\n", errMsg)
+		}
+		return fmt.Errorf("%d resources failed to load", len(failed))
+	}
+}
+
+// GetCachedActions returns the cached list of actions
+func GetCachedActions() []antbox.Feature {
+	return cachedActions
+}
+
+// GetCachedExtensions returns the cached list of extensions
+func GetCachedExtensions() []antbox.Feature {
+	return cachedExtensions
+}
+
+// GetCachedAgents returns the cached list of agents
+func GetCachedAgents() []antbox.Agent {
+	return cachedAgents
+}
+
+// GetCachedAspects returns the cached list of aspects
+func GetCachedAspects() []antbox.Aspect {
+	return cachedAspects
 }
