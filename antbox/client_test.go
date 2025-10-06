@@ -66,7 +66,7 @@ func TestListNodes(t *testing.T) {
 			t.Errorf("Expected 'GET' request, got '%s'", r.Method)
 		}
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{"nodes":[{"uuid":"test-uuid","title":"test-title"}],"total":1}`)
+		fmt.Fprintln(w, `[{"uuid":"test-uuid","title":"test-title"}]`)
 	}))
 	defer server.Close()
 
@@ -384,7 +384,7 @@ func TestUploadFile(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, "", "", "test-jwt", false)
-	node, err := client.CreateFile(tempFile.Name(), "parent-uuid")
+	node, err := client.CreateFile(tempFile.Name(), map[string]any{"parent": "parent-uuid"})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

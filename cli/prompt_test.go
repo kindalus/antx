@@ -53,7 +53,13 @@ func (c *mockClient) ChangeNodeName(uuid, newName string) error {
 	return nil
 }
 
-func (c *mockClient) CreateFile(filePath, parentUuid string) (*antbox.Node, error) {
+func (c *mockClient) CreateFile(filePath string, metadata map[string]any) (*antbox.Node, error) {
+	parentUuid := ""
+	if parent, ok := metadata["parent"]; ok {
+		if parentStr, ok := parent.(string); ok {
+			parentUuid = parentStr
+		}
+	}
 	return &antbox.Node{UUID: "uploaded-uuid", Title: "uploaded-file.txt", Parent: parentUuid}, nil
 }
 
@@ -96,8 +102,8 @@ func (c *mockClient) AnswerFromAgent(agentUUID string, query string, temperature
 	return "Mock answer response", nil
 }
 
-func (c *mockClient) RagChat(message string, conversationID string, filters map[string]any, history []map[string]any) (string, error) {
-	return "Mock rag response", nil
+func (c *mockClient) RagChat(message string, options map[string]any) (antbox.ChatResponse, error) {
+	return antbox.ChatResponse{Text: "Mock rag response", History: []map[string]any{}}, nil
 }
 
 // New interface methods
@@ -884,7 +890,13 @@ func (c *enhancedMockClient) ChangeNodeName(uuid, newName string) error {
 	return nil
 }
 
-func (c *enhancedMockClient) CreateFile(filePath, parentUuid string) (*antbox.Node, error) {
+func (c *enhancedMockClient) CreateFile(filePath string, metadata map[string]any) (*antbox.Node, error) {
+	parentUuid := ""
+	if parent, ok := metadata["parent"]; ok {
+		if parentStr, ok := parent.(string); ok {
+			parentUuid = parentStr
+		}
+	}
 	return &antbox.Node{UUID: "uploaded-uuid", Title: "uploaded-file.txt", Parent: parentUuid}, nil
 }
 
@@ -927,8 +939,8 @@ func (c *enhancedMockClient) AnswerFromAgent(agentUUID string, query string, tem
 	return "Mock answer response", nil
 }
 
-func (c *enhancedMockClient) RagChat(message string, conversationID string, filters map[string]any, history []map[string]any) (string, error) {
-	return "Mock rag response", nil
+func (c *enhancedMockClient) RagChat(message string, options map[string]any) (antbox.ChatResponse, error) {
+	return antbox.ChatResponse{Text: "Mock rag response", History: []map[string]any{}}, nil
 }
 
 // New interface methods
