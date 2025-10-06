@@ -34,7 +34,7 @@ func (c *CallCommand) Execute(args []string) {
 	extensionUUID := args[0]
 
 	// Parse parameters from remaining arguments
-	parameters := make(map[string]interface{})
+	parameters := make(map[string]any)
 	for i := 1; i < len(args); i++ {
 		param := args[i]
 		if strings.Contains(param, "=") {
@@ -121,15 +121,15 @@ func (c *CallCommand) Suggest(d prompt.Document) []prompt.Suggest {
 	return []prompt.Suggest{}
 }
 
-func printExtensionResult(result interface{}) {
+func printExtensionResult(result any) {
 	switch v := result.(type) {
 	case string:
 		fmt.Printf("  %s\n", v)
-	case map[string]interface{}:
+	case map[string]any:
 		for key, value := range v {
 			fmt.Printf("  %s: %v\n", key, value)
 		}
-	case []interface{}:
+	case []any:
 		for i, item := range v {
 			fmt.Printf("  [%d]: %v\n", i, item)
 		}

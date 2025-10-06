@@ -19,22 +19,24 @@ func (c *ChatCommand) GetDescription() string {
 }
 
 func (c *ChatCommand) Execute(args []string) {
-	if len(args) < 2 {
-		fmt.Println("Usage: chat [options] <agent_uuid> <message>")
+	if len(args) == 0 {
+		fmt.Println("Usage: chat [options] <agent_uuid> [message]")
 		fmt.Println("Options:")
 		fmt.Println("  -t <temperature>  Temperature for response generation (0.0-1.0)")
 		fmt.Println("  -m <max_tokens>   Maximum tokens in the response")
-		fmt.Println("  -c <conversation_id>  Conversation ID to continue previous conversation")
 		fmt.Println()
 		fmt.Println("Arguments:")
 		fmt.Println("  agent_uuid: UUID of the agent to chat with")
-		fmt.Println("  message: Message to send to the agent")
+		fmt.Println("  message: Initial message to send (optional)")
+		fmt.Println()
+		fmt.Println("Interactive mode:")
+		fmt.Println("  Chat is always interactive. If a message is provided, it's sent first.")
+		fmt.Println("  Type 'exit' or press Ctrl+D to exit the session.")
 		return
 	}
 
 	var temperature *float64
 	var maxTokens *int
-	var conversationID string
 	var agentUUID string
 	var messageArgs []string
 
@@ -66,13 +68,7 @@ func (c *ChatCommand) Execute(args []string) {
 			}
 			maxTokens = &tokens
 			i += 2
-		case "-c":
-			if i+1 >= len(args) {
-				fmt.Println("Error: -c requires a conversation ID")
-				return
-			}
-			conversationID = args[i+1]
-			i += 2
+
 		default:
 			// First non-option argument is agent UUID
 			if agentUUID == "" {
@@ -91,45 +87,13 @@ parseComplete:
 		return
 	}
 
-	if len(messageArgs) == 0 {
-		fmt.Println("Error: Message is required")
-		return
+	// Always enter interactive mode, optionally with initial message
+	var initialMessage string
+	if len(messageArgs) > 0 {
+		initialMessage = strings.Join(messageArgs, " ")
 	}
 
-	message := strings.Join(messageArgs, " ")
-
-	// Get or create session if conversation ID is provided
-	var session *Session
-	if conversationID != "" {
-		session = GetOrCreateSession(conversationID)
-
-		// Add user message to session history
-		session.AddMessage("user", message)
-	}
-
-	// Get conversation history if this is a continuing conversation
-	var history []map[string]interface{}
-	if session != nil && !session.IsEmpty() {
-		// For subsequent messages, include history (excluding the current user message we just added)
-		allHistory := session.GetHistoryAsMap()
-		if len(allHistory) > 1 {
-			// Exclude the last message (current user message) from history sent to API
-			history = allHistory[:len(allHistory)-1]
-		}
-	}
-
-	response, err := client.ChatWithAgent(agentUUID, message, conversationID, temperature, maxTokens, history)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-
-	// Add assistant response to session history
-	if session != nil {
-		session.AddMessage("assistant", response)
-	}
-
-	fmt.Println(response)
+	c.startInteractiveSession(agentUUID, initialMessage, temperature, maxTokens)
 }
 
 func (c *ChatCommand) Suggest(d prompt.Document) []prompt.Suggest {
@@ -171,7 +135,6 @@ func (c *ChatCommand) Suggest(d prompt.Document) []prompt.Suggest {
 		return []prompt.Suggest{
 			{Text: "-t", Description: "Set temperature (0.0-1.0)"},
 			{Text: "-m", Description: "Set max tokens"},
-			{Text: "-c", Description: "Set conversation ID"},
 		}
 	}
 
@@ -194,6 +157,83 @@ func (c *ChatCommand) Suggest(d prompt.Document) []prompt.Suggest {
 	}
 
 	return []prompt.Suggest{}
+}
+
+// startInteractiveSession starts an interactive chat session with the specified agent
+func (c *ChatCommand) startInteractiveSession(agentUUID string, initialMessage string, temperature *float64, maxTokens *int) {
+	// Find agent name for display
+	agentName := agentUUID
+	for _, agent := range GetCachedAgents() {
+		if agent.UUID == agentUUID {
+			agentName = agent.Title
+			break
+		}
+	}
+
+	fmt.Printf("Starting interactive chat with %s\n", agentName)
+	fmt.Println("Type 'exit' or press Ctrl+D to exit the session.")
+	fmt.Println()
+
+	// Send initial message if provided
+	if initialMessage != "" {
+		fmt.Printf("You: %s\n", initialMessage)
+		c.sendMessage(agentUUID, initialMessage, temperature, maxTokens)
+		fmt.Println()
+	}
+
+	// Create interactive session context
+	sessionContext := &ChatSessionContext{
+		agentUUID:   agentUUID,
+		temperature: temperature,
+		maxTokens:   maxTokens,
+		command:     c,
+	}
+
+	// Create a new prompt for the chat session
+	p := prompt.New(
+		sessionContext.executeMessage,
+		func(d prompt.Document) []prompt.Suggest { return []prompt.Suggest{} },
+		prompt.OptionTitle(fmt.Sprintf("Chat with %s", agentName)),
+		prompt.OptionPrefix("You: "),
+	)
+	p.Run()
+}
+
+// ChatSessionContext holds the context for an interactive chat session
+type ChatSessionContext struct {
+	agentUUID   string
+	temperature *float64
+	maxTokens   *int
+	command     *ChatCommand
+}
+
+func (ctx *ChatSessionContext) executeMessage(input string) {
+	input = strings.TrimSpace(input)
+
+	// Check for exit command
+	if input == "exit" {
+		fmt.Println("Exiting chat session...")
+		return
+	}
+
+	// Skip empty messages
+	if input == "" {
+		return
+	}
+
+	// Send message and display response
+	ctx.command.sendMessage(ctx.agentUUID, input, ctx.temperature, ctx.maxTokens)
+}
+
+// sendMessage sends a single message to the agent and displays the response
+func (c *ChatCommand) sendMessage(agentUUID string, message string, temperature *float64, maxTokens *int) {
+	response, err := client.ChatWithAgent(agentUUID, message, "", temperature, maxTokens, nil)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	fmt.Printf("Assistant: %s\n", response)
 }
 
 func init() {

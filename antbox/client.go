@@ -9,10 +9,13 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httputil"
+	"net/textproto"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/gabriel-vasile/mimetype"
 )
 
 type client struct {
@@ -302,7 +305,7 @@ func (c *client) ChangeNodeName(uuid, newName string) error {
 	return nil
 }
 
-func (c *client) CreateFile(path, parentUuid string) (*Node, error) {
+func (c *client) CreateFile(path string, metadata map[string]any) (*Node, error) {
 
 	path, err := expandTilde(path)
 	if err != nil {
@@ -324,20 +327,27 @@ func (c *client) CreateFile(path, parentUuid string) (*Node, error) {
 	writer := multipart.NewWriter(&requestBody)
 
 	// Add the file
-	part, err := writer.CreateFormFile("file", filepath.Base(path))
-	if err != nil {
-		return nil, err
-	}
+	// part, err := writer.CreateFormFile("file", filepath.Base(path))
+	// if err != nil {
+	// 	return nil, err
+	// }
+	//
+	//
+
+	partHeader := textproto.MIMEHeader{}
+	partHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", filepath.Base(path)))
+	partHeader.Set("Content-Type", detectMimetype(path))
+	part, err := writer.CreatePart(partHeader)
 
 	_, err = io.Copy(part, file)
 	if err != nil {
 		return nil, err
 	}
 
-	// Add the metadata with parent UUID as JSON
-	metadata := map[string]string{
-		"parent": parentUuid,
+	if metadata == nil {
+		metadata = make(map[string]any)
 	}
+
 	metadataJSON, err := json.Marshal(metadata)
 	if err != nil {
 		return nil, err
@@ -379,6 +389,20 @@ func (c *client) CreateFile(path, parentUuid string) (*Node, error) {
 	}
 
 	return &node, nil
+}
+
+func detectMimetype(path string) string {
+
+	if strings.HasSuffix(path, ".js") {
+		return "application/vnd.antbox.feature"
+	}
+
+	m, err := mimetype.DetectFile(path)
+	if err != nil {
+		return "application/octet-stream"
+	}
+
+	return strings.Split(m.String(), ";")[0]
 }
 
 func (c *client) UpdateFile(uuid, filePath string) (*Node, error) {
@@ -510,7 +534,7 @@ func (c *client) EvaluateNode(uuid string) ([]Node, error) {
 
 	// The evaluate endpoint returns a generic object, but for smartfolders
 	// it should contain a "nodes" array similar to the find result
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
@@ -606,8 +630,8 @@ func (c *client) GetBreadcrumbs(uuid string) ([]Node, error) {
 	return breadcrumbs, nil
 }
 
-func (c *client) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]interface{}) (string, error) {
-	options := make(map[string]interface{})
+func (c *client) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]any) (string, error) {
+	options := make(map[string]any)
 
 	if conversationID != "" && len(history) > 0 {
 		// Add conversation history if we have a conversationID and history
@@ -620,7 +644,7 @@ func (c *client) ChatWithAgent(agentUUID string, message string, conversationID 
 		options["maxTokens"] = *maxTokens
 	}
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"text": message,
 	}
 
@@ -653,7 +677,7 @@ func (c *client) ChatWithAgent(agentUUID string, message string, conversationID 
 	}
 
 	// Try to decode as array first (conversation history format)
-	var arrayResult []map[string]interface{}
+	var arrayResult []map[string]any
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
@@ -665,8 +689,8 @@ func (c *client) ChatWithAgent(agentUUID string, message string, conversationID 
 		for i := len(arrayResult) - 1; i >= 0; i-- {
 			message := arrayResult[i]
 			if role, ok := message["role"].(string); ok && role == "model" {
-				if parts, ok := message["parts"].([]interface{}); ok && len(parts) > 0 {
-					if part, ok := parts[0].(map[string]interface{}); ok {
+				if parts, ok := message["parts"].([]any); ok && len(parts) > 0 {
+					if part, ok := parts[0].(map[string]any); ok {
 						if text, ok := part["text"].(string); ok {
 							return text, nil
 						}
@@ -680,7 +704,7 @@ func (c *client) ChatWithAgent(agentUUID string, message string, conversationID 
 	}
 
 	// Try to decode as object (traditional format)
-	var objectResult map[string]interface{}
+	var objectResult map[string]any
 	if err := json.Unmarshal(body, &objectResult); err == nil {
 		// Extract the response message
 		if response, ok := objectResult["response"]; ok {
@@ -698,7 +722,7 @@ func (c *client) ChatWithAgent(agentUUID string, message string, conversationID 
 }
 
 func (c *client) AnswerFromAgent(agentUUID string, query string, temperature *float64, maxTokens *int) (string, error) {
-	options := make(map[string]interface{})
+	options := make(map[string]any)
 
 	if temperature != nil {
 		options["temperature"] = *temperature
@@ -707,7 +731,7 @@ func (c *client) AnswerFromAgent(agentUUID string, query string, temperature *fl
 		options["maxTokens"] = *maxTokens
 	}
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"text": query,
 	}
 
@@ -739,7 +763,7 @@ func (c *client) AnswerFromAgent(agentUUID string, query string, temperature *fl
 		return "", NewHttpErrorWithRequestBody(resp, req, string(jsonData))
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
 	}
@@ -756,19 +780,9 @@ func (c *client) AnswerFromAgent(agentUUID string, query string, temperature *fl
 	return string(responseJson), nil
 }
 
-func (c *client) RagChat(message string, conversationID string, filters map[string]interface{}, history []map[string]interface{}) (string, error) {
-	options := make(map[string]interface{})
+func (c *client) RagChat(message string, options map[string]any) (ChatResponse, error) {
 
-	if conversationID != "" && len(history) > 0 {
-		// Add conversation history if we have a conversationID and history
-		options["history"] = history
-	}
-	// Add parent or other filter options
-	for k, v := range filters {
-		options[k] = v
-	}
-
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"text": message,
 	}
 
@@ -778,12 +792,12 @@ func (c *client) RagChat(message string, conversationID string, filters map[stri
 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		return "", err
+		return ChatResponse{}, err
 	}
 
 	req, err := http.NewRequest("POST", c.ServerURL+"/agents/rag/-/chat", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", err
+		return ChatResponse{}, err
 	}
 
 	c.SetAuthHeader(req)
@@ -791,19 +805,19 @@ func (c *client) RagChat(message string, conversationID string, filters map[stri
 
 	resp, err := c.roundTrip(req)
 	if err != nil {
-		return "", err
+		return ChatResponse{}, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", NewHttpErrorWithRequestBody(resp, req, string(jsonData))
+		return ChatResponse{}, NewHttpErrorWithRequestBody(resp, req, string(jsonData))
 	}
 
 	// Try to decode as array first (conversation history format)
-	var arrayResult []map[string]interface{}
+	var arrayResult []map[string]any
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return ChatResponse{}, err
 	}
 
 	if err := json.Unmarshal(body, &arrayResult); err == nil {
@@ -812,36 +826,46 @@ func (c *client) RagChat(message string, conversationID string, filters map[stri
 		for i := len(arrayResult) - 1; i >= 0; i-- {
 			message := arrayResult[i]
 			if role, ok := message["role"].(string); ok && role == "model" {
-				if parts, ok := message["parts"].([]interface{}); ok && len(parts) > 0 {
-					if part, ok := parts[0].(map[string]interface{}); ok {
+				if parts, ok := message["parts"].([]any); ok && len(parts) > 0 {
+					if part, ok := parts[0].(map[string]any); ok {
 						if text, ok := part["text"].(string); ok {
-							return text, nil
+							return ChatResponse{
+								Text:    text,
+								History: arrayResult,
+							}, nil
 						}
 					}
 				}
 			}
 		}
-		// If no model response found, return the whole array as JSON
-		responseJson, _ := json.MarshalIndent(arrayResult, "", "  ")
-		return string(responseJson), nil
+		// If no model response found, return the whole array
+
+		return ChatResponse{
+			History: arrayResult,
+		}, nil
 	}
 
 	// Try to decode as object (traditional format)
-	var objectResult map[string]interface{}
+	var objectResult map[string]any
 	if err := json.Unmarshal(body, &objectResult); err == nil {
 		// Extract the response message
 		if response, ok := objectResult["response"]; ok {
 			if responseStr, ok := response.(string); ok {
-				return responseStr, nil
+				return ChatResponse{
+					Text:    responseStr,
+					History: arrayResult,
+				}, nil
 			}
 		}
-		// Fallback to return the whole response as JSON string
-		responseJson, _ := json.MarshalIndent(objectResult, "", "  ")
-		return string(responseJson), nil
+		// Fallback to return the whole response
+		return ChatResponse{
+			History: arrayResult,
+		}, nil
 	}
 
-	// If neither format works, return the raw response
-	return string(body), nil
+	return ChatResponse{
+		History: arrayResult,
+	}, nil
 }
 
 func (c *client) CopyNode(uuid, parent, title string) (*Node, error) {
@@ -1097,7 +1121,7 @@ func (c *client) ListExtensionFeatures() ([]Feature, error) {
 	return features, nil
 }
 
-func (c *client) RunFeatureAsAction(uuid string, uuids []string) (map[string]interface{}, error) {
+func (c *client) RunFeatureAsAction(uuid string, uuids []string) (map[string]any, error) {
 	url := c.ServerURL + "/features/" + uuid + "/-/run-action?uuids=" + strings.Join(uuids, ",")
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -1117,7 +1141,7 @@ func (c *client) RunFeatureAsAction(uuid string, uuids []string) (map[string]int
 		return nil, NewHttpErrorWithRequestBody(resp, req, "")
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
@@ -1125,7 +1149,7 @@ func (c *client) RunFeatureAsAction(uuid string, uuids []string) (map[string]int
 	return result, nil
 }
 
-func (c *client) RunFeatureAsExtension(uuid string, params map[string]interface{}) (string, error) {
+func (c *client) RunFeatureAsExtension(uuid string, params map[string]any) (string, error) {
 	jsonData, err := json.Marshal(params)
 	if err != nil {
 		return "", err
@@ -1186,7 +1210,7 @@ func (c *client) ListActions() ([]Feature, error) {
 	return features, nil
 }
 
-func (c *client) RunAction(uuid string, request ActionRunRequest) (map[string]interface{}, error) {
+func (c *client) RunAction(uuid string, request ActionRunRequest) (map[string]any, error) {
 	jsonData, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -1212,7 +1236,7 @@ func (c *client) RunAction(uuid string, request ActionRunRequest) (map[string]in
 		return nil, NewHttpErrorWithRequestBody(resp, req, requestBodyStr)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
@@ -1247,7 +1271,7 @@ func (c *client) ListExtensions() ([]Feature, error) {
 	return features, nil
 }
 
-func (c *client) RunExtension(uuid string, data map[string]interface{}) (interface{}, error) {
+func (c *client) RunExtension(uuid string, data map[string]any) (any, error) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -1273,7 +1297,7 @@ func (c *client) RunExtension(uuid string, data map[string]interface{}) (interfa
 		return nil, NewHttpErrorWithRequestBody(resp, req, requestBodyStr)
 	}
 
-	var result interface{}
+	var result any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
@@ -1308,7 +1332,7 @@ func (c *client) ListAITools() ([]Feature, error) {
 	return features, nil
 }
 
-func (c *client) RunAITool(uuid string, params map[string]interface{}) (map[string]interface{}, error) {
+func (c *client) RunAITool(uuid string, params map[string]any) (map[string]any, error) {
 	jsonData, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
@@ -1334,7 +1358,7 @@ func (c *client) RunAITool(uuid string, params map[string]interface{}) (map[stri
 		return nil, NewHttpErrorWithRequestBody(resp, req, requestBodyStr)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
@@ -1977,7 +2001,7 @@ func (c *client) DeleteAspect(uuid string) error {
 	return nil
 }
 
-func (c *client) ExportAspect(uuid string, format string) (interface{}, error) {
+func (c *client) ExportAspect(uuid string, format string) (any, error) {
 	url := c.ServerURL + "/aspects/" + uuid + "/-/export"
 	if format != "" {
 		url += "?format=" + format
@@ -2000,7 +2024,7 @@ func (c *client) ExportAspect(uuid string, format string) (interface{}, error) {
 		return nil, NewHttpErrorWithRequestBody(resp, req, "")
 	}
 
-	var result interface{}
+	var result any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}

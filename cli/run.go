@@ -37,7 +37,7 @@ func (c *RunCommand) Execute(args []string) {
 	nodeUUID := args[1]
 
 	// Parse parameters from remaining arguments
-	parameters := make(map[string]interface{})
+	parameters := make(map[string]any)
 	for i := 2; i < len(args); i++ {
 		param := args[i]
 		if strings.Contains(param, "=") {
@@ -144,7 +144,7 @@ func parseAsFloat(s string) (float64, error) {
 	return result, err
 }
 
-func printResult(result map[string]interface{}) {
+func printResult(result map[string]any) {
 	for key, value := range result {
 		fmt.Printf("  %s: %v\n", key, value)
 	}

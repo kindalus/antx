@@ -82,17 +82,17 @@ type Feature struct {
 
 // Parameter represents a feature parameter
 type Parameter struct {
-	Name         string      `json:"name,omitempty"`
-	Type         string      `json:"type,omitempty"`
-	Description  string      `json:"description,omitempty"`
-	Required     bool        `json:"required,omitempty"`
-	DefaultValue interface{} `json:"defaultValue,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Type         string `json:"type,omitempty"`
+	Description  string `json:"description,omitempty"`
+	Required     bool   `json:"required,omitempty"`
+	DefaultValue any    `json:"defaultValue,omitempty"`
 }
 
 // ActionRunRequest represents a request to run an action
 type ActionRunRequest struct {
-	UUIDs      []string               `json:"uuids"`
-	Parameters map[string]interface{} `json:"parameters,omitempty"`
+	UUIDs      []string       `json:"uuids"`
+	Parameters map[string]any `json:"parameters,omitempty"`
 }
 
 // Agent represents an AI agent
@@ -118,20 +118,20 @@ type AgentCreate struct {
 
 // AgentChatRequest represents a chat request to an agent
 type AgentChatRequest struct {
-	Text    string                 `json:"text"`
-	Options map[string]interface{} `json:"options,omitempty"`
+	Text    string         `json:"text"`
+	Options map[string]any `json:"options,omitempty"`
 }
 
 // AgentAnswerRequest represents an answer request to an agent
 type AgentAnswerRequest struct {
-	Text    string                 `json:"text"`
-	Options map[string]interface{} `json:"options,omitempty"`
+	Text    string         `json:"text"`
+	Options map[string]any `json:"options,omitempty"`
 }
 
 // RagChatRequest represents a RAG chat request
 type RagChatRequest struct {
-	Text    string                 `json:"text"`
-	Options map[string]interface{} `json:"options,omitempty"`
+	Text    string         `json:"text"`
+	Options map[string]any `json:"options,omitempty"`
 }
 
 // APIKey represents an API key
@@ -290,7 +290,7 @@ func (e *HttpError) formatJSON(body string) string {
 	if (strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) ||
 		(strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]")) {
 
-		var jsonData interface{}
+		var jsonData any
 		if err := json.Unmarshal([]byte(trimmed), &jsonData); err == nil {
 			if prettyJSON, err := json.MarshalIndent(jsonData, "", "  "); err == nil {
 				return string(prettyJSON)

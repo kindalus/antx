@@ -2,6 +2,11 @@ package antbox
 
 import "net/http"
 
+type ChatResponse struct {
+	Text    string
+	History []map[string]any
+}
+
 type Antbox interface {
 	// Authentication
 	Login() error
@@ -15,7 +20,7 @@ type Antbox interface {
 	RemoveNode(uuid string) error
 	MoveNode(uuid, newParent string) error
 	ChangeNodeName(uuid, newName string) error
-	CreateFile(filePath, parentUuid string) (*Node, error)
+	CreateFile(filePath string, metadata map[string]any) (*Node, error)
 	UpdateFile(uuid, filePath string) (*Node, error)
 	FindNodes(filters any, pageSize, pageToken int) (*NodeFilterResult, error)
 	EvaluateNode(uuid string) ([]Node, error)
@@ -32,29 +37,29 @@ type Antbox interface {
 	ExportFeature(uuid string, exportType string) (string, error)
 	ListActionFeatures() ([]Feature, error)
 	ListExtensionFeatures() ([]Feature, error)
-	RunFeatureAsAction(uuid string, uuids []string) (map[string]interface{}, error)
-	RunFeatureAsExtension(uuid string, params map[string]interface{}) (string, error)
+	RunFeatureAsAction(uuid string, uuids []string) (map[string]any, error)
+	RunFeatureAsExtension(uuid string, params map[string]any) (string, error)
 
 	// Action operations
 	ListActions() ([]Feature, error)
-	RunAction(uuid string, request ActionRunRequest) (map[string]interface{}, error)
+	RunAction(uuid string, request ActionRunRequest) (map[string]any, error)
 
 	// Extension operations
 	ListExtensions() ([]Feature, error)
-	RunExtension(uuid string, data map[string]interface{}) (interface{}, error)
+	RunExtension(uuid string, data map[string]any) (any, error)
 
 	// AI Tool operations
 	ListAITools() ([]Feature, error)
-	RunAITool(uuid string, params map[string]interface{}) (map[string]interface{}, error)
+	RunAITool(uuid string, params map[string]any) (map[string]any, error)
 
 	// Agent operations
 	ListAgents() ([]Agent, error)
 	CreateAgent(agent AgentCreate) (*Agent, error)
 	GetAgent(uuid string) (*Agent, error)
 	DeleteAgent(uuid string) error
-	ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]interface{}) (string, error)
+	ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]any) (string, error)
 	AnswerFromAgent(agentUUID string, query string, temperature *float64, maxTokens *int) (string, error)
-	RagChat(message string, conversationID string, filters map[string]interface{}, history []map[string]interface{}) (string, error)
+	RagChat(message string, options map[string]any) (ChatResponse, error)
 
 	// API Key operations
 	ListAPIKeys() ([]APIKey, error)
@@ -84,7 +89,7 @@ type Antbox interface {
 	CreateAspect(aspect AspectCreate) (*Aspect, error)
 	GetAspect(uuid string) (*Aspect, error)
 	DeleteAspect(uuid string) error
-	ExportAspect(uuid string, format string) (interface{}, error)
+	ExportAspect(uuid string, format string) (any, error)
 }
 
 func NewClient(serverURL, apiKey, root, jwt string, debug bool) Antbox {

@@ -61,7 +61,7 @@ func (c *mockClient) UpdateFile(uuid, filePath string) (*antbox.Node, error) {
 	return &antbox.Node{UUID: uuid, Title: "updated-file.txt", Parent: "--root--"}, nil
 }
 
-func (c *mockClient) FindNodes(filters interface{}, pageSize, pageToken int) (*antbox.NodeFilterResult, error) {
+func (c *mockClient) FindNodes(filters any, pageSize, pageToken int) (*antbox.NodeFilterResult, error) {
 	return &antbox.NodeFilterResult{
 		Nodes:     []antbox.Node{{UUID: "found-uuid", Title: "found-node", Mimetype: "text/plain"}},
 		PageSize:  pageSize,
@@ -88,7 +88,7 @@ func (c *mockClient) GetBreadcrumbs(uuid string) ([]antbox.Node, error) {
 	}, nil
 }
 
-func (c *mockClient) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]interface{}) (string, error) {
+func (c *mockClient) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]any) (string, error) {
 	return "Mock chat response", nil
 }
 
@@ -96,7 +96,7 @@ func (c *mockClient) AnswerFromAgent(agentUUID string, query string, temperature
 	return "Mock answer response", nil
 }
 
-func (c *mockClient) RagChat(message string, conversationID string, filters map[string]interface{}, history []map[string]interface{}) (string, error) {
+func (c *mockClient) RagChat(message string, conversationID string, filters map[string]any, history []map[string]any) (string, error) {
 	return "Mock rag response", nil
 }
 
@@ -137,11 +137,11 @@ func (c *mockClient) ListExtensionFeatures() ([]antbox.Feature, error) {
 	return []antbox.Feature{{UUID: "extension-feature-uuid", Title: "Extension Feature"}}, nil
 }
 
-func (c *mockClient) RunFeatureAsAction(uuid string, uuids []string) (map[string]interface{}, error) {
-	return map[string]interface{}{"result": "action executed"}, nil
+func (c *mockClient) RunFeatureAsAction(uuid string, uuids []string) (map[string]any, error) {
+	return map[string]any{"result": "action executed"}, nil
 }
 
-func (c *mockClient) RunFeatureAsExtension(uuid string, params map[string]interface{}) (string, error) {
+func (c *mockClient) RunFeatureAsExtension(uuid string, params map[string]any) (string, error) {
 	return "<html>Extension response</html>", nil
 }
 
@@ -149,24 +149,24 @@ func (c *mockClient) ListActions() ([]antbox.Feature, error) {
 	return []antbox.Feature{{UUID: "action-uuid", Title: "Test Action"}}, nil
 }
 
-func (c *mockClient) RunAction(uuid string, request antbox.ActionRunRequest) (map[string]interface{}, error) {
-	return map[string]interface{}{"result": "action executed"}, nil
+func (c *mockClient) RunAction(uuid string, request antbox.ActionRunRequest) (map[string]any, error) {
+	return map[string]any{"result": "action executed"}, nil
 }
 
 func (c *mockClient) ListExtensions() ([]antbox.Feature, error) {
 	return []antbox.Feature{{UUID: "extension-uuid", Title: "Test Extension"}}, nil
 }
 
-func (c *mockClient) RunExtension(uuid string, data map[string]interface{}) (interface{}, error) {
-	return map[string]interface{}{"result": "extension executed"}, nil
+func (c *mockClient) RunExtension(uuid string, data map[string]any) (any, error) {
+	return map[string]any{"result": "extension executed"}, nil
 }
 
 func (c *mockClient) ListAITools() ([]antbox.Feature, error) {
 	return []antbox.Feature{{UUID: "ai-tool-uuid", Title: "Test AI Tool"}}, nil
 }
 
-func (c *mockClient) RunAITool(uuid string, params map[string]interface{}) (map[string]interface{}, error) {
-	return map[string]interface{}{"result": "ai tool executed"}, nil
+func (c *mockClient) RunAITool(uuid string, params map[string]any) (map[string]any, error) {
+	return map[string]any{"result": "ai tool executed"}, nil
 }
 
 func (c *mockClient) ListAgents() ([]antbox.Agent, error) {
@@ -261,8 +261,8 @@ func (c *mockClient) DeleteAspect(uuid string) error {
 	return nil
 }
 
-func (c *mockClient) ExportAspect(uuid string, format string) (interface{}, error) {
-	return map[string]interface{}{"exported": "aspect data"}, nil
+func (c *mockClient) ExportAspect(uuid string, format string) (any, error) {
+	return map[string]any{"exported": "aspect data"}, nil
 }
 
 func TestExecutor(t *testing.T) {
@@ -669,7 +669,7 @@ func TestFindCommandParsing(t *testing.T) {
 	// Test value conversion
 	valueTests := []struct {
 		input    string
-		expected interface{}
+		expected any
 	}{
 		{"123", 123},
 		{"45.67", 45.67},
@@ -741,7 +741,7 @@ func TestFindCommandCompleteWorkflow(t *testing.T) {
 					t.Errorf("Expected complex search for '%s'", searchText)
 				}
 
-				var filterList [][]interface{}
+				var filterList [][]any
 				parts := strings.Split(searchText, ",")
 
 				for _, part := range parts {
@@ -756,11 +756,11 @@ func TestFindCommandCompleteWorkflow(t *testing.T) {
 					if len(tokens) >= 3 {
 						if len(tokens) == 3 {
 							value := convertValue(tokens[2])
-							filterList = append(filterList, []interface{}{tokens[0], tokens[1], value})
+							filterList = append(filterList, []any{tokens[0], tokens[1], value})
 						} else {
 							valueStr := strings.Join(tokens[2:], " ")
 							value := convertValue(valueStr)
-							filterList = append(filterList, []interface{}{tokens[0], tokens[1], value})
+							filterList = append(filterList, []any{tokens[0], tokens[1], value})
 						}
 					}
 				}
@@ -892,7 +892,7 @@ func (c *enhancedMockClient) UpdateFile(uuid, filePath string) (*antbox.Node, er
 	return &antbox.Node{UUID: uuid, Title: "updated-file.txt", Parent: "--root--"}, nil
 }
 
-func (c *enhancedMockClient) FindNodes(filters interface{}, pageSize, pageToken int) (*antbox.NodeFilterResult, error) {
+func (c *enhancedMockClient) FindNodes(filters any, pageSize, pageToken int) (*antbox.NodeFilterResult, error) {
 	return &antbox.NodeFilterResult{
 		Nodes:     []antbox.Node{{UUID: "found-uuid", Title: "found-node", Mimetype: "text/plain"}},
 		PageSize:  pageSize,
@@ -919,7 +919,7 @@ func (c *enhancedMockClient) GetBreadcrumbs(uuid string) ([]antbox.Node, error) 
 	}, nil
 }
 
-func (c *enhancedMockClient) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]interface{}) (string, error) {
+func (c *enhancedMockClient) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]any) (string, error) {
 	return "Mock chat response", nil
 }
 
@@ -927,7 +927,7 @@ func (c *enhancedMockClient) AnswerFromAgent(agentUUID string, query string, tem
 	return "Mock answer response", nil
 }
 
-func (c *enhancedMockClient) RagChat(message string, conversationID string, filters map[string]interface{}, history []map[string]interface{}) (string, error) {
+func (c *enhancedMockClient) RagChat(message string, conversationID string, filters map[string]any, history []map[string]any) (string, error) {
 	return "Mock rag response", nil
 }
 
@@ -968,11 +968,11 @@ func (c *enhancedMockClient) ListExtensionFeatures() ([]antbox.Feature, error) {
 	return []antbox.Feature{{UUID: "extension-feature-uuid", Title: "Extension Feature"}}, nil
 }
 
-func (c *enhancedMockClient) RunFeatureAsAction(uuid string, uuids []string) (map[string]interface{}, error) {
-	return map[string]interface{}{"result": "action executed"}, nil
+func (c *enhancedMockClient) RunFeatureAsAction(uuid string, uuids []string) (map[string]any, error) {
+	return map[string]any{"result": "action executed"}, nil
 }
 
-func (c *enhancedMockClient) RunFeatureAsExtension(uuid string, params map[string]interface{}) (string, error) {
+func (c *enhancedMockClient) RunFeatureAsExtension(uuid string, params map[string]any) (string, error) {
 	return "<html>Extension response</html>", nil
 }
 
@@ -980,24 +980,24 @@ func (c *enhancedMockClient) ListActions() ([]antbox.Feature, error) {
 	return []antbox.Feature{{UUID: "action-uuid", Title: "Test Action"}}, nil
 }
 
-func (c *enhancedMockClient) RunAction(uuid string, request antbox.ActionRunRequest) (map[string]interface{}, error) {
-	return map[string]interface{}{"result": "action executed"}, nil
+func (c *enhancedMockClient) RunAction(uuid string, request antbox.ActionRunRequest) (map[string]any, error) {
+	return map[string]any{"result": "action executed"}, nil
 }
 
 func (c *enhancedMockClient) ListExtensions() ([]antbox.Feature, error) {
 	return []antbox.Feature{{UUID: "extension-uuid", Title: "Test Extension"}}, nil
 }
 
-func (c *enhancedMockClient) RunExtension(uuid string, data map[string]interface{}) (interface{}, error) {
-	return map[string]interface{}{"result": "extension executed"}, nil
+func (c *enhancedMockClient) RunExtension(uuid string, data map[string]any) (any, error) {
+	return map[string]any{"result": "extension executed"}, nil
 }
 
 func (c *enhancedMockClient) ListAITools() ([]antbox.Feature, error) {
 	return []antbox.Feature{{UUID: "ai-tool-uuid", Title: "Test AI Tool"}}, nil
 }
 
-func (c *enhancedMockClient) RunAITool(uuid string, params map[string]interface{}) (map[string]interface{}, error) {
-	return map[string]interface{}{"result": "ai tool executed"}, nil
+func (c *enhancedMockClient) RunAITool(uuid string, params map[string]any) (map[string]any, error) {
+	return map[string]any{"result": "ai tool executed"}, nil
 }
 
 func (c *enhancedMockClient) ListAgents() ([]antbox.Agent, error) {
@@ -1092,8 +1092,8 @@ func (c *enhancedMockClient) DeleteAspect(uuid string) error {
 	return nil
 }
 
-func (c *enhancedMockClient) ExportAspect(uuid string, format string) (interface{}, error) {
-	return map[string]interface{}{"exported": "aspect data"}, nil
+func (c *enhancedMockClient) ExportAspect(uuid string, format string) (any, error) {
+	return map[string]any{"exported": "aspect data"}, nil
 }
 
 func TestSmartfolderCdAndLsBehavior(t *testing.T) {

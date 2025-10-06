@@ -59,7 +59,7 @@ func TestNodeMarshalWithAllFields(t *testing.T) {
 		Group:         []string{"admin"},
 		Authenticated: []string{"read", "write"},
 		Anonymous:     []string{"read"},
-		Advanced:      map[string]interface{}{"custom": "value"},
+		Advanced:      map[string]any{"custom": "value"},
 	}
 
 	node := Node{
