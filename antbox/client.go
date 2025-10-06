@@ -2032,6 +2032,164 @@ func (c *client) ExportAspect(uuid string, format string) (any, error) {
 	return result, nil
 }
 
+func (c *client) UploadFeature(filePath string, metadata map[string]any) (*Feature, error) {
+	filePath, err := expandTilde(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	filePath, err = filepath.Abs(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var requestBody bytes.Buffer
+	writer := multipart.NewWriter(&requestBody)
+
+	// Add the file
+	partHeader := textproto.MIMEHeader{}
+	partHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", filepath.Base(filePath)))
+	partHeader.Set("Content-Type", "application/vnd.antbox.feature")
+	part, err := writer.CreatePart(partHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = io.Copy(part, file)
+	if err != nil {
+		return nil, err
+	}
+
+	if metadata != nil {
+		metadataJSON, err := json.Marshal(metadata)
+		if err != nil {
+			return nil, err
+		}
+
+		err = writer.WriteField("metadata", string(metadataJSON))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = writer.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	requestBodyStr := requestBody.String()
+
+	req, err := http.NewRequest("POST", c.ServerURL+"/features/-/upload", &requestBody)
+	if err != nil {
+		return nil, err
+	}
+
+	c.SetAuthHeader(req)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, NewHttpErrorWithRequestBody(resp, req, requestBodyStr)
+	}
+
+	var feature Feature
+	if err := json.NewDecoder(resp.Body).Decode(&feature); err != nil {
+		return nil, err
+	}
+
+	return &feature, nil
+}
+
+func (c *client) UploadAspect(filePath string, metadata map[string]any) (*Aspect, error) {
+	filePath, err := expandTilde(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	filePath, err = filepath.Abs(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var requestBody bytes.Buffer
+	writer := multipart.NewWriter(&requestBody)
+
+	// Add the file
+	partHeader := textproto.MIMEHeader{}
+	partHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", filepath.Base(filePath)))
+	partHeader.Set("Content-Type", "application/vnd.antbox.aspect")
+	part, err := writer.CreatePart(partHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = io.Copy(part, file)
+	if err != nil {
+		return nil, err
+	}
+
+	if metadata != nil {
+		metadataJSON, err := json.Marshal(metadata)
+		if err != nil {
+			return nil, err
+		}
+
+		err = writer.WriteField("metadata", string(metadataJSON))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = writer.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	requestBodyStr := requestBody.String()
+
+	req, err := http.NewRequest("POST", c.ServerURL+"/aspects/-/upload", &requestBody)
+	if err != nil {
+		return nil, err
+	}
+
+	c.SetAuthHeader(req)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, NewHttpErrorWithRequestBody(resp, req, requestBodyStr)
+	}
+
+	var aspect Aspect
+	if err := json.NewDecoder(resp.Body).Decode(&aspect); err != nil {
+		return nil, err
+	}
+
+	return &aspect, nil
+}
+
 func expandTilde(path string) (string, error) {
 	if !strings.HasPrefix(path, "~") {
 		return path, nil

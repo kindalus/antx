@@ -39,6 +39,7 @@ type Antbox interface {
 	ListExtensionFeatures() ([]Feature, error)
 	RunFeatureAsAction(uuid string, uuids []string) (map[string]any, error)
 	RunFeatureAsExtension(uuid string, params map[string]any) (string, error)
+	UploadFeature(filePath string, metadata map[string]any) (*Feature, error)
 
 	// Action operations
 	ListActions() ([]Feature, error)
@@ -90,6 +91,7 @@ type Antbox interface {
 	GetAspect(uuid string) (*Aspect, error)
 	DeleteAspect(uuid string) error
 	ExportAspect(uuid string, format string) (any, error)
+	UploadAspect(filePath string, metadata map[string]any) (*Aspect, error)
 }
 
 func NewClient(serverURL, apiKey, root, jwt string, debug bool) Antbox {

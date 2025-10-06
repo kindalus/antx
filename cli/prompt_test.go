@@ -268,7 +268,15 @@ func (c *mockClient) DeleteAspect(uuid string) error {
 }
 
 func (c *mockClient) ExportAspect(uuid string, format string) (any, error) {
-	return map[string]any{"exported": "aspect data"}, nil
+	return map[string]any{"exported": "aspect"}, nil
+}
+
+func (c *mockClient) UploadFeature(filePath string, metadata map[string]any) (*antbox.Feature, error) {
+	return &antbox.Feature{UUID: "uploaded-feature-uuid", Title: "uploaded-feature.js"}, nil
+}
+
+func (c *mockClient) UploadAspect(filePath string, metadata map[string]any) (*antbox.Aspect, error) {
+	return &antbox.Aspect{UUID: "uploaded-aspect-uuid", Title: "uploaded-aspect"}, nil
 }
 
 func TestExecutor(t *testing.T) {
@@ -606,6 +614,59 @@ func TestUploadUpdateCommand(t *testing.T) {
 	}
 	if len(suggests) > 0 && suggests[0].Text != "test-uuid" {
 		t.Errorf("Expected suggestion 'test-uuid', got '%s'", suggests[0].Text)
+	}
+}
+
+func TestUploadFeatureCommand(t *testing.T) {
+	client = &mockClient{}
+
+	// Test that upload -f executes without error
+	uploadCmd := &UploadCommand{}
+
+	// This will call the mock client's UploadFeature method
+	// We can't easily test the output without complex mocking,
+	// but we can verify it doesn't panic or error
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Upload feature command panicked: %v", r)
+		}
+	}()
+
+	uploadCmd.Execute([]string{"-f", "/path/to/feature.js"})
+}
+
+func TestUploadAspectCommand(t *testing.T) {
+	client = &mockClient{}
+
+	// Test that upload -a executes without error
+	uploadCmd := &UploadCommand{}
+
+	// This will call the mock client's UploadAspect method
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Upload aspect command panicked: %v", r)
+		}
+	}()
+
+	uploadCmd.Execute([]string{"-a", "/path/to/aspect.xml"})
+}
+
+func TestUploadCommandFlags(t *testing.T) {
+	client = &mockClient{}
+
+	// Test upload command flag suggestions
+	doc := createTestDocument("upload -")
+	suggests := completer(doc)
+
+	expectedFlags := []string{"-f", "-a", "-u"}
+	if len(suggests) != len(expectedFlags) {
+		t.Errorf("Expected %d flag suggestions, got %d", len(expectedFlags), len(suggests))
+	}
+
+	for i, expected := range expectedFlags {
+		if i < len(suggests) && suggests[i].Text != expected {
+			t.Errorf("Expected flag '%s' at position %d, got '%s'", expected, i, suggests[i].Text)
+		}
 	}
 }
 
@@ -1105,7 +1166,15 @@ func (c *enhancedMockClient) DeleteAspect(uuid string) error {
 }
 
 func (c *enhancedMockClient) ExportAspect(uuid string, format string) (any, error) {
-	return map[string]any{"exported": "aspect data"}, nil
+	return map[string]any{"exported": "aspect"}, nil
+}
+
+func (c *enhancedMockClient) UploadFeature(filePath string, metadata map[string]any) (*antbox.Feature, error) {
+	return &antbox.Feature{UUID: "uploaded-feature-uuid", Title: "uploaded-feature.js"}, nil
+}
+
+func (c *enhancedMockClient) UploadAspect(filePath string, metadata map[string]any) (*antbox.Aspect, error) {
+	return &antbox.Aspect{UUID: "uploaded-aspect-uuid", Title: "uploaded-aspect"}, nil
 }
 
 func TestSmartfolderCdAndLsBehavior(t *testing.T) {

@@ -20,7 +20,11 @@ A shell-like CLI for Antbox.
 - `rm <uuid>`: Remove a node given the uuid.
 - `mv <uuid> <uuid>`: Move a node to another node (folder).
 - `rename <uuid> <new name>`: Change the name of a node to the new name.
-- `cp <file path> <uuid>`: Upload a file from the local filesystem to a folder given the uuid.
+- `upload [options] <file path>`: Upload a file from the local filesystem
+  - `upload <file path>`: Upload to current folder
+  - `upload -u <uuid> <file path>`: Update existing file
+  - `upload -f <file path>`: Upload as feature (to /features endpoint)
+  - `upload -a <file path>`: Upload as aspect (to /aspects endpoint)
 - `get <uuid>`: Download the node with the given uuid to the Downloads folder. The filename will be the same as the title of the node.
 
 ### Interactive Chat Commands
