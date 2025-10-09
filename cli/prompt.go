@@ -11,7 +11,7 @@ import (
 )
 
 // Suggestion Window Behavior:
-// - Tab: Navigate to next suggestion
+// - Tab: Navigate to next suggestion OR trigger suggestions if none shown
 // - Shift+Tab: Navigate to previous suggestion
 // - Up/Down arrows: Navigate through suggestions
 // - Enter: Select current suggestion and close window
@@ -24,6 +24,7 @@ import (
 // - Window disappears after adding space following a complete argument
 // - Window disappears on multiple consecutive spaces
 // - Use Ctrl+Space to manually hide suggestions
+// - Tab can be used to manually trigger suggestions at any time
 //
 // Available Commands:
 // - pwd: Show current path using breadcrumbs
@@ -88,7 +89,47 @@ func executor(in string) {
 func completer(d prompt.Document) []prompt.Suggest {
 	text := d.TextBeforeCursor()
 
-	// Hide suggestions if text is empty or just whitespace
+	// Check if Tab was the last keystroke - if so, force show suggestions
+	if d.LastKeyStroke() == prompt.Tab || d.LastKeyStroke() == prompt.ControlI {
+		// For Tab, we want to show suggestions even when they would normally be hidden
+		args := strings.Split(text, " ")
+		commandName := strings.TrimSpace(args[0])
+
+		// Case 1: Empty text or just whitespace - show all commands
+		if strings.TrimSpace(text) == "" {
+			var suggests []prompt.Suggest
+			for name, cmd := range commands {
+				suggests = append(suggests, prompt.Suggest{Text: name, Description: cmd.GetDescription()})
+			}
+			return suggests
+		}
+
+		// Case 2: Single word (command name) - show matching commands
+		if len(args) == 1 && !strings.HasSuffix(text, " ") {
+			var suggests []prompt.Suggest
+			for name, cmd := range commands {
+				// Show all commands that match the prefix (including exact matches)
+				if strings.HasPrefix(name, commandName) {
+					suggests = append(suggests, prompt.Suggest{Text: name, Description: cmd.GetDescription()})
+				}
+			}
+			return suggests
+		}
+
+		// Case 3: Command followed by space or arguments - show command suggestions
+		if cmd, ok := commands[commandName]; ok {
+			return cmd.Suggest(d)
+		}
+
+		// Case 4: Invalid command - show all commands as fallback
+		var suggests []prompt.Suggest
+		for name, cmd := range commands {
+			suggests = append(suggests, prompt.Suggest{Text: name, Description: cmd.GetDescription()})
+		}
+		return suggests
+	}
+
+	// Normal suggestion logic - hide suggestions if text is empty or just whitespace
 	if strings.TrimSpace(text) == "" {
 		return []prompt.Suggest{}
 	}
