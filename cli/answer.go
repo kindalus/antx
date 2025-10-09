@@ -89,11 +89,26 @@ parseComplete:
 
 	question := strings.Join(questionArgs, " ")
 
+	// Find agent name for display
+	agentName := agentUUID
+	for _, agent := range GetCachedAgents() {
+		if agent.UUID == agentUUID {
+			agentName = agent.Title
+			break
+		}
+	}
+
+	// Show loading animation while waiting for response
+	animation := StartLoadingAnimationWithStyle(fmt.Sprintf("Asking %s", agentName), SpinnerStyle)
 	chatHistory, err := client.AnswerFromAgent(agentUUID, question, temperature, maxTokens)
+
 	if err != nil {
+		animation.StopWithMessage(fmt.Sprintf("✗ Error asking %s", agentName))
 		fmt.Println("Error:", err)
 		return
 	}
+
+	animation.StopWithMessage(fmt.Sprintf("✓ Response from %s:", agentName))
 
 	// Find the last model response from the chat history
 	for i := len(chatHistory) - 1; i >= 0; i-- {

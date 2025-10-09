@@ -227,11 +227,26 @@ func (ctx *ChatSessionContext) executeMessage(input string) {
 
 // sendMessage sends a single message to the agent and displays the response
 func (c *ChatCommand) sendMessage(agentUUID string, message string, temperature *float64, maxTokens *int) {
+	// Find agent name for display
+	agentName := agentUUID
+	for _, agent := range GetCachedAgents() {
+		if agent.UUID == agentUUID {
+			agentName = agent.Title
+			break
+		}
+	}
+
+	// Show loading animation while waiting for response (dots style is less distracting in chat)
+	animation := StartLoadingAnimationWithStyle(fmt.Sprintf("Chatting with %s", agentName), DotsStyle)
 	chatHistory, err := client.ChatWithAgent(agentUUID, message, "", temperature, maxTokens, nil)
+
 	if err != nil {
+		animation.StopWithMessage(fmt.Sprintf("✗ Error chatting with %s", agentName))
 		fmt.Println("Error:", err)
 		return
 	}
+
+	animation.StopWithMessage(fmt.Sprintf("✓ %s:", agentName))
 
 	// Find the last model response from the chat history
 	for i := len(chatHistory) - 1; i >= 0; i-- {

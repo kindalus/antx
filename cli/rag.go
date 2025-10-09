@@ -137,11 +137,21 @@ func (c *RagCommand) sendMessage(message string, history []map[string]any, useLo
 		options["history"] = history
 	}
 
+	// Show loading animation while waiting for response
+	loadingMessage := "Processing with RAG"
+	if useLocation {
+		loadingMessage = fmt.Sprintf("Processing with RAG (context: %s)", getCurrentFolderName())
+	}
+	animation := StartLoadingAnimationWithStyle(loadingMessage, BarStyle)
 	chatHistory, err := client.RagChat(message, options)
+
 	if err != nil {
+		animation.StopWithMessage("✗ Error processing RAG request")
 		fmt.Println("Error:", err)
 		return nil
 	}
+
+	animation.StopWithMessage("✓ RAG response:")
 
 	// Find the last model response from the chat history
 	var responseText string
