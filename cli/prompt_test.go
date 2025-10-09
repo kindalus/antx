@@ -576,7 +576,7 @@ func TestCommandSuggestionsMinLength(t *testing.T) {
 		{"m", 3}, // should match "mkdir", "mv", "mksmart"
 		{"c", 3}, // should match "cd", "chat", "cp"
 		{"e", 3}, // should match "exec", "exit", "extensions"
-		{"a", 3}, // should match "agents", "actions", "answer"
+		{"a", 4}, // should match "agents", "actions", "answer", "aliases"
 		{"h", 1}, // should match "help"
 	}
 

@@ -58,11 +58,11 @@ func (c *HelpCommand) Execute(args []string) {
 		"Navigation & Browsing": {"cd", "ls", "pwd", "find", "stat"},
 		"File Operations":       {"cp", "duplicate", "mv", "rename", "rm", "upload", "download"},
 		"Folder Management":     {"mkdir", "mksmart"},
-		"Actions & Extensions":  {"run", "call"},
-		"AI & Agents":           {"chat", "answer", "rag"},
+		"Actions & Extensions":  {"run", "exec", "actions", "extensions"},
+		"AI & Agents":           {"chat", "answer", "rag", "agents"},
 		"Session Management":    {"sessions"},
-		"Templates":             {"template"},
-		"System Management":     {"reload", "status", "help", "exit"},
+		"Templates & Docs":      {"templates", "docs"},
+		"System Management":     {"aliases", "reload", "status", "help", "exit"},
 	}
 
 	// Print commands by category
@@ -73,7 +73,7 @@ func (c *HelpCommand) Execute(args []string) {
 		"Actions & Extensions",
 		"AI & Agents",
 		"Session Management",
-		"Templates",
+		"Templates & Docs",
 		"System Management",
 	} {
 		fmt.Printf("%s:\n", category)

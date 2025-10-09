@@ -62,6 +62,15 @@ func executor(in string) {
 	commandName := parts[0]
 	args := parts[1:]
 
+	// Resolve aliases in arguments (except for cd command with .. argument)
+	for i, arg := range args {
+		// Special case: don't resolve ".." for cd command to preserve navigation behavior
+		if commandName == "cd" && arg == ".." {
+			continue
+		}
+		args[i] = resolveAlias(arg)
+	}
+
 	if cmd, ok := commands[commandName]; ok {
 		cmd.Execute(args)
 	} else {
@@ -321,6 +330,23 @@ func getCurrentFolderName() string {
 		return "root"
 	}
 	return currentNode.Title
+}
+
+// resolveAlias resolves special aliases to actual UUIDs
+// . -> current node UUID
+// .. -> parent node UUID
+func resolveAlias(arg string) string {
+	switch arg {
+	case ".":
+		return currentNode.UUID
+	case "..":
+		if currentNode.Parent == "" {
+			return "--root--"
+		}
+		return currentNode.Parent
+	default:
+		return arg
+	}
 }
 
 // GetCachedAspects returns the cached list of aspects
