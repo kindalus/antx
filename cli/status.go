@@ -35,6 +35,15 @@ func (c *StatusCommand) Execute(args []string) {
 	extensions := GetCachedExtensions()
 	agents := GetCachedAgents()
 
+	fmt.Println("Current Location:")
+	fmt.Println("========================================")
+	fmt.Printf("  Current node: %s (%s)\n", getCurrentFolderName(), currentNode.UUID)
+	if currentNode.Parent != "" {
+		fmt.Printf("  Parent node:  %s\n", currentNode.Parent)
+	}
+	fmt.Printf("  Nodes here:   %d\n", len(currentNodes))
+	fmt.Println()
+
 	fmt.Println("Cached Resource Statistics:")
 	fmt.Println("========================================")
 	fmt.Printf("  Aspects:    %d\n", len(aspects))
@@ -45,6 +54,23 @@ func (c *StatusCommand) Execute(args []string) {
 
 	total := len(aspects) + len(actions) + len(extensions) + len(agents)
 	fmt.Printf("Total resources: %d\n", total)
+
+	// Show configuration information
+	fmt.Println()
+	fmt.Println("Configuration:")
+	fmt.Println("========================================")
+	if configPath, exists, err := getConfigInfo(); err == nil {
+		fmt.Printf("  Config file: %s\n", configPath)
+		if exists {
+			fmt.Printf("  Status:      EXISTS\n")
+		} else {
+			fmt.Printf("  Status:      Will be created on first command\n")
+		}
+	} else {
+		fmt.Printf("  Config file: Error getting path (%v)\n", err)
+	}
+	fmt.Printf("  History:     %d commands saved\n", len(cliHistory))
+	fmt.Printf("  Max history: %d commands\n", maxHistorySize)
 
 	// Show conversation session statistics
 	sessionCount := GetActiveSessionCount()

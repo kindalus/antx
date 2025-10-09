@@ -577,7 +577,7 @@ func TestCommandSuggestionsMinLength(t *testing.T) {
 		{"c", 3}, // should match "cd", "chat", "cp"
 		{"e", 3}, // should match "exec", "exit", "extensions"
 		{"a", 4}, // should match "agents", "actions", "answer", "aliases"
-		{"h", 1}, // should match "help"
+		{"h", 2}, // should match "help", "history"
 	}
 
 	for _, test := range testInputs {

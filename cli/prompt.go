@@ -48,6 +48,7 @@ var (
 	client       antbox.Antbox
 	currentNode  antbox.Node
 	currentNodes []antbox.Node
+	cliHistory   []string
 
 	// Cached data loaded at startup
 	cachedAspects    []antbox.Aspect
@@ -58,6 +59,10 @@ var (
 
 func executor(in string) {
 	in = strings.TrimSpace(in)
+
+	// Add command to history (will be saved to disk)
+	addCommandToHistory(in)
+
 	parts := strings.Split(in, " ")
 	commandName := parts[0]
 	args := parts[1:]
@@ -152,6 +157,11 @@ func Start(serverURL, apiKey, root, jwt string, debug bool) {
 	// Initialize current node and load cached data at startup
 	initializeCurrentNodeAndCacheData()
 
+	// Restore CLI state from saved configuration
+	if err := restoreFromConfig(); err != nil {
+		fmt.Printf("Note: Could not restore previous session: %v\n", err)
+	}
+
 	// Initial ls
 	if cmd, ok := commands["ls"]; ok {
 		cmd.Execute([]string{})
@@ -188,12 +198,15 @@ func Start(serverURL, apiKey, root, jwt string, debug bool) {
 func initializeCurrentNodeAndCacheData() {
 	fmt.Print("Initializing... ")
 
-	// Initialize current node (start at root)
+	// Initialize current node (start at root - will be overridden by restoreFromConfig if saved state exists)
 	currentNode = antbox.Node{
 		UUID:     "--root--",
 		Title:    "root",
 		Mimetype: "application/vnd.antbox.folder",
 	}
+
+	// Initialize empty history
+	cliHistory = []string{}
 
 	// List current folder contents
 	if nodes, err := client.ListNodes("--root--"); err == nil {

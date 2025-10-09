@@ -62,7 +62,7 @@ func (c *HelpCommand) Execute(args []string) {
 		"AI & Agents":           {"chat", "answer", "rag", "agents"},
 		"Session Management":    {"sessions"},
 		"Templates & Docs":      {"templates", "docs"},
-		"System Management":     {"aliases", "reload", "status", "help", "exit"},
+		"System Management":     {"aliases", "history", "reload", "status", "help", "exit"},
 	}
 
 	// Print commands by category
