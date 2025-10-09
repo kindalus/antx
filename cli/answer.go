@@ -89,13 +89,27 @@ parseComplete:
 
 	question := strings.Join(questionArgs, " ")
 
-	response, err := client.AnswerFromAgent(agentUUID, question, temperature, maxTokens)
+	chatHistory, err := client.AnswerFromAgent(agentUUID, question, temperature, maxTokens)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
 
-	fmt.Println(response)
+	// Find the last model response from the chat history
+	for i := len(chatHistory) - 1; i >= 0; i-- {
+		msg := chatHistory[i]
+		if msg.Role == "model" {
+			for _, part := range msg.Parts {
+				if part.Text != nil {
+					fmt.Println(*part.Text)
+					return
+				}
+			}
+		}
+	}
+
+	// If no model response found, show that no response was received
+	fmt.Println("(no response)")
 }
 
 func (c *AnswerCommand) Suggest(d prompt.Document) []prompt.Suggest {

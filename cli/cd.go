@@ -25,30 +25,36 @@ func (c *CdCommand) Execute(args []string) {
 			Title:    "root",
 			Mimetype: "application/vnd.antbox.folder",
 		}
-	} else if args[0] == ".." {
-		// Go to parent
-		if currentNode.UUID == "--root--" {
-			return // Already at root
-		}
-		if currentNode.Parent == "" || currentNode.Parent == "--root--" {
-			// Parent is root
-			currentNode = antbox.Node{
-				UUID:     "--root--",
-				Title:    "root",
-				Mimetype: "application/vnd.antbox.folder",
+	} else {
+		var targetUUID string
+
+		// Handle special case: ".." means navigate to parent (original behavior)
+		if args[0] == ".." {
+			if currentNode.UUID == "--root--" {
+				return // Already at root
+			}
+			if currentNode.Parent == "" || currentNode.Parent == "--root--" {
+				// Parent is root
+				currentNode = antbox.Node{
+					UUID:     "--root--",
+					Title:    "root",
+					Mimetype: "application/vnd.antbox.folder",
+				}
+				// List contents of new current folder
+				if cmd, ok := commands["ls"]; ok {
+					cmd.Execute([]string{})
+				}
+				return
+			} else {
+				targetUUID = currentNode.Parent
 			}
 		} else {
-			// Get parent node
-			parentNode, err := client.GetNode(currentNode.Parent)
-			if err != nil {
-				fmt.Println("Error:", err)
-				return
-			}
-			currentNode = *parentNode
+			// For any other argument (including resolved aliases), treat as UUID to navigate to
+			targetUUID = args[0]
 		}
-	} else {
-		// Go to specified node
-		node, err := client.GetNode(args[0])
+
+		// Get target node and navigate to it
+		node, err := client.GetNode(targetUUID)
 		if err != nil {
 			fmt.Println("Error:", err)
 			return

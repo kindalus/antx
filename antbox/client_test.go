@@ -384,7 +384,7 @@ func TestUploadFile(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, "", "", "test-jwt", false)
-	node, err := client.CreateFile(tempFile.Name(), map[string]any{"parent": "parent-uuid"})
+	node, err := client.CreateFile(tempFile.Name(), NodeCreate{Parent: "parent-uuid"})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

@@ -227,13 +227,27 @@ func (ctx *ChatSessionContext) executeMessage(input string) {
 
 // sendMessage sends a single message to the agent and displays the response
 func (c *ChatCommand) sendMessage(agentUUID string, message string, temperature *float64, maxTokens *int) {
-	response, err := client.ChatWithAgent(agentUUID, message, "", temperature, maxTokens, nil)
+	chatHistory, err := client.ChatWithAgent(agentUUID, message, "", temperature, maxTokens, nil)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
 
-	fmt.Printf("Assistant: %s\n", response)
+	// Find the last model response from the chat history
+	for i := len(chatHistory) - 1; i >= 0; i-- {
+		msg := chatHistory[i]
+		if msg.Role == "model" {
+			for _, part := range msg.Parts {
+				if part.Text != nil {
+					fmt.Printf("Assistant: %s\n", *part.Text)
+					return
+				}
+			}
+		}
+	}
+
+	// If no model response found, show that no response was received
+	fmt.Println("Assistant: (no response)")
 }
 
 func init() {

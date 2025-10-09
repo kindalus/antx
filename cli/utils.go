@@ -2,6 +2,7 @@ package cli
 
 import (
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -116,6 +117,7 @@ func normalizeOperators(input string) string {
 				i++
 			}
 		}
+
 		result = newResult.String()
 	}
 
@@ -160,6 +162,45 @@ func ls(args []string) {
 	if cmd, ok := commands["ls"]; ok {
 		cmd.Execute(args)
 	}
+}
+
+// sortNodesForListing sorts nodes with directories first, then files, both alphabetically by title
+func sortNodesForListing(nodes []antbox.Node) []antbox.Node {
+	if len(nodes) == 0 {
+		return nodes
+	}
+
+	// Separate directories and files
+	var directories []antbox.Node
+	var files []antbox.Node
+
+	for _, node := range nodes {
+		isFolder := node.Mimetype == "application/vnd.antbox.folder" ||
+			node.Mimetype == "application/vnd.antbox.smartfolder"
+
+		if isFolder {
+			directories = append(directories, node)
+		} else {
+			files = append(files, node)
+		}
+	}
+
+	// Sort directories alphabetically by title
+	sort.Slice(directories, func(i, j int) bool {
+		return directories[i].Title < directories[j].Title
+	})
+
+	// Sort files alphabetically by title
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Title < files[j].Title
+	})
+
+	// Combine directories first, then files
+	result := make([]antbox.Node, 0, len(nodes))
+	result = append(result, directories...)
+	result = append(result, files...)
+
+	return result
 }
 
 // formatModifiedDate formats a date string to local time with conditional year display

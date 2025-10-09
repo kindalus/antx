@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/c-bata/go-prompt"
 )
@@ -38,6 +39,22 @@ func (c *StatCommand) Execute(args []string) {
 	if node.Group != "" {
 		fmt.Printf(template, "Group", node.Group)
 	}
+
+	// Show permissions if not a folder
+	if strings.HasSuffix(node.Mimetype, "folder") {
+
+		fmt.Printf(template, "Permissions", "")
+		if len(node.Permissions.Group) > 0 {
+			fmt.Printf("  %-9s: %s\n", "Group", strings.Join(node.Permissions.Group, ", "))
+		}
+		if len(node.Permissions.Authenticated) > 0 {
+			fmt.Printf("  %-9s: %s\n", "Auth", strings.Join(node.Permissions.Authenticated, ", "))
+		}
+		if len(node.Permissions.Anonymous) > 0 {
+			fmt.Printf("  %-9s: %s\n", "Anonymous", strings.Join(node.Permissions.Anonymous, ", "))
+		}
+	}
+
 	fmt.Printf(template, "Size", node.HumanReadableSize())
 	fmt.Printf(template, "Created at", node.CreatedAt)
 	fmt.Printf(template, "Modified at", node.ModifiedAt)

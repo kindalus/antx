@@ -96,6 +96,7 @@ paths:
         "500":
           $ref: "#/components/responses/ServiceUnavailable"
 
+  /features/-/upload:
     post:
       tags:
         - Features
@@ -129,6 +130,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -158,46 +161,6 @@ paths:
         "500":
           $ref: "#/components/responses/ServiceUnavailable"
 
-    put:
-      tags:
-        - Features
-      summary: Update feature
-      description: Update an existing feature by uploading a new file
-      security:
-        - BearerAuth: []
-        - ApiKeyAuth: []
-        - ApiKeyQuery: []
-      parameters:
-        - $ref: "#/components/parameters/UuidPath"
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                file:
-                  type: string
-                  format: binary
-                  description: Feature file (JavaScript/TypeScript)
-              required:
-                - file
-      responses:
-        "200":
-          description: Feature updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Feature"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/ServiceUnavailable"
-
     delete:
       tags:
         - Features
@@ -219,7 +182,7 @@ paths:
         "500":
           $ref: "#/components/responses/ServiceUnavailable"
 
-  /features/{uuid}/export:
+  /features/{uuid}/-/export:
     get:
       tags:
         - Features
@@ -273,7 +236,7 @@ paths:
         "500":
           $ref: "#/components/responses/ServiceUnavailable"
 
-  /actions/{uuid}/run:
+  /actions/{uuid}/-/run:
     post:
       tags:
         - Actions
@@ -337,7 +300,7 @@ paths:
         "500":
           $ref: "#/components/responses/ServiceUnavailable"
 
-  /extensions/{uuid}/run:
+  /extensions/{uuid}/-/exec:
     post:
       tags:
         - Extensions
@@ -411,7 +374,125 @@ paths:
         "500":
           $ref: "#/components/responses/ServiceUnavailable"
 
-  /ai-tools/{uuid}/run:
+  /templates:
+    get:
+      tags:
+        - Templates
+      summary: List all templates
+      description: |
+        Retrieve a list of all available templates.
+        Templates are predefined code snippets and configurations.
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+        - ApiKeyQuery: []
+      responses:
+        "200":
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Template"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /templates/{uuid}:
+    get:
+      tags:
+        - Templates
+      summary: Get template content by UUID
+      description: |
+        Retrieve template content by UUID. Returns the actual template file content
+        with appropriate content type (TypeScript, JavaScript, or JSON).
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+        - ApiKeyQuery: []
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      responses:
+        "200":
+          description: Template content
+          content:
+            text/typescript:
+              schema:
+                type: string
+                description: TypeScript template content
+            text/javascript:
+              schema:
+                type: string
+                description: JavaScript template content
+            application/json:
+              schema:
+                type: object
+                description: JSON template content
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /docs:
+    get:
+      tags:
+        - Documentation
+      summary: List all documentation
+      description: |
+        Retrieve a list of all available documentation.
+        Documentation includes guides, API references, and system information.
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+        - ApiKeyQuery: []
+      responses:
+        "200":
+          description: List of documentation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DocInfo"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /docs/{uuid}:
+    get:
+      tags:
+        - Documentation
+      summary: Get documentation by UUID
+      description: |
+        Retrieve documentation content by UUID. Returns markdown content
+        for the specified documentation identifier.
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+        - ApiKeyQuery: []
+      parameters:
+        - $ref: "#/components/parameters/UuidPath"
+      responses:
+        "200":
+          description: Documentation content
+          content:
+            text/markdown:
+              schema:
+                type: string
+                description: Markdown documentation content
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /ai-tools/{uuid}/-/run:
     post:
       tags:
         - AI Tools
@@ -477,13 +558,12 @@ paths:
         "500":
           $ref: "#/components/responses/ServiceUnavailable"
 
+  /agents/-/upload:
     post:
       tags:
         - Agents
       summary: Create or replace agent
-      description: |
-        Create a new AI agent or replace an existing one.
-        Agents require system instructions and can use various AI models.
+      description: Create a new agent or replace an existing one by uploading metadata
       security:
         - BearerAuth: []
         - ApiKeyAuth: []
@@ -491,9 +571,16 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              $ref: "#/components/schemas/AgentCreate"
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Agent metadata file (JSON)
+              required:
+                - file
       responses:
         "201":
           description: Agent created successfully
@@ -505,6 +592,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -575,19 +664,6 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/AgentChatRequest"
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                input:
-                  type: string
-                  description: JSON string containing {text, options} structure
-                file0:
-                  type: string
-                  format: binary
-                  description: Optional file attachment (can include multiple files as file0, file1, etc.)
-              required:
-                - input
       responses:
         "200":
           description: Chat response from agent
@@ -625,19 +701,6 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/AgentAnswerRequest"
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                input:
-                  type: string
-                  description: JSON string containing {text, options} structure
-                file0:
-                  type: string
-                  format: binary
-                  description: Optional file attachment (can include multiple files as file0, file1, etc.)
-              required:
-                - input
       responses:
         "200":
           description: Answer from agent
@@ -1484,44 +1547,6 @@ paths:
         "500":
           $ref: "#/components/responses/ServiceUnavailable"
 
-  # Templates
-  /templates/{uuid}:
-    get:
-      tags:
-        - Templates
-      summary: Get template content by UUID
-      description: |
-        Retrieve template content by UUID. Templates are pre-defined
-        code structures for creating new features or nodes.
-      security:
-        - BearerAuth: []
-        - ApiKeyAuth: []
-        - ApiKeyQuery: []
-      parameters:
-        - $ref: "#/components/parameters/UuidPath"
-      responses:
-        "200":
-          description: Template content
-          content:
-            text/typescript:
-              schema:
-                type: string
-                description: TypeScript template content
-            text/javascript:
-              schema:
-                type: string
-                description: JavaScript template content
-            application/json:
-              schema:
-                type: object
-                description: JSON template content
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/ServiceUnavailable"
-
   # Aspects
   /aspects:
     get:
@@ -1549,13 +1574,12 @@ paths:
         "500":
           $ref: "#/components/responses/ServiceUnavailable"
 
+  /aspects/-/upload:
     post:
       tags:
         - Aspects
       summary: Create or replace aspect
-      description: |
-        Create a new aspect or replace an existing one.
-        Aspects extend the functionality of nodes.
+      description: Create a new aspect or replace an existing one by uploading a file
       security:
         - BearerAuth: []
         - ApiKeyAuth: []
@@ -1563,9 +1587,16 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              $ref: "#/components/schemas/AspectCreate"
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Aspect file (JavaScript/TypeScript)
+              required:
+                - file
       responses:
         "201":
           description: Aspect created or replaced successfully
@@ -1577,6 +1608,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/ServiceUnavailable"
 
@@ -1749,36 +1782,41 @@ components:
           type: string
           format: uuid
           description: Unique identifier for the feature
-        fid:
-          type: string
-          description: File identifier
-        title:
-          type: string
-          description: Feature title
         name:
           type: string
           description: Feature name
         description:
           type: string
           description: Feature description
-        mimetype:
-          type: string
-          description: MIME type of the feature
-        parent:
-          type: string
-          description: Parent folder UUID
-        owner:
-          type: string
-          description: Owner email
-        group:
-          type: string
-          description: Group UUID
-        exposeAsAction:
+        exposeAction:
           type: boolean
           description: Whether feature is exposed as an action
-        exposeAsExtension:
+        runOnCreates:
+          type: boolean
+          description: Whether feature runs automatically on node creation
+        runOnUpdates:
+          type: boolean
+          description: Whether feature runs automatically on node updates
+        runManually:
+          type: boolean
+          description: Whether feature can be run manually
+        filters:
+          $ref: "#/components/schemas/NodeFilters"
+          description: Node filters that determine when the feature runs
+        exposeExtension:
           type: boolean
           description: Whether feature is exposed as an extension
+        exposeAITool:
+          type: boolean
+          description: Whether feature is exposed as an AI tool
+        runAs:
+          type: string
+          description: Email of user to run the feature as
+        groupsAllowed:
+          type: array
+          items:
+            type: string
+          description: Groups allowed to execute this feature
         parameters:
           type: array
           items:
@@ -1786,20 +1824,15 @@ components:
           description: Feature parameters
         returnType:
           type: string
+          enum:
+            ["string", "number", "boolean", "array", "object", "file", "void"]
           description: Return type of the feature
         returnDescription:
           type: string
           description: Description of the return value
-        permissions:
-          $ref: "#/components/schemas/Permissions"
-        createdAt:
+        returnContentType:
           type: string
-          format: date-time
-          description: Creation timestamp
-        modifiedAt:
-          type: string
-          format: date-time
-          description: Last modification timestamp
+          description: Content type of the return value (for file returns)
 
     Parameter:
       type: object
@@ -1907,42 +1940,35 @@ components:
         title:
           type: string
           description: Aspect title
-        name:
-          type: string
-          description: Aspect name
         description:
           type: string
           description: Aspect description
-        mimetype:
-          type: string
-          description: MIME type
-        owner:
-          type: string
-          description: Owner email
-        permissions:
-          $ref: "#/components/schemas/Permissions"
+        filters:
+          $ref: "#/components/schemas/NodeFilters"
+          description: Node filters for aspect application
+        properties:
+          type: object
+          additionalProperties: true
+          description: Aspect properties configuration
 
     AspectCreate:
       type: object
       required:
         - title
-        - name
-        - mimetype
       properties:
         title:
           type: string
           description: Aspect title
-        name:
-          type: string
-          description: Aspect name
         description:
           type: string
           description: Aspect description
-        mimetype:
-          type: string
-          description: MIME type
-        permissions:
-          $ref: "#/components/schemas/Permissions"
+        filters:
+          $ref: "#/components/schemas/NodeFilters"
+          description: Node filters for aspect application
+        properties:
+          type: object
+          additionalProperties: true
+          description: Aspect properties configuration
 
     Permissions:
       type: object
@@ -2057,32 +2083,46 @@ components:
           type: string
           format: uuid
           description: Unique identifier for the agent
-        systemInstructions:
-          type: string
-          description: System instructions for the AI agent
         title:
           type: string
           description: Agent title
         description:
           type: string
           description: Agent description
-        model:
-          type: string
-          description: AI model to use
         owner:
           type: string
           description: Owner email
-        group:
-          type: string
-          description: Group UUID
-        createdAt:
+        created:
           type: string
           format: date-time
           description: Creation timestamp
-        modifiedAt:
+        updated:
           type: string
           format: date-time
           description: Last modification timestamp
+        model:
+          type: string
+          description: AI model to use
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          description: Temperature for response generation
+        maxTokens:
+          type: integer
+          description: Maximum tokens in the response
+        reasoning:
+          type: boolean
+          description: Whether the agent uses reasoning
+        useTools:
+          type: boolean
+          description: Whether the agent can use tools
+        systemInstructions:
+          type: string
+          description: System instructions for the AI agent
+        structuredAnswer:
+          type: string
+          description: Structured answer format (optional)
 
     AgentCreate:
       type: object
@@ -2090,9 +2130,6 @@ components:
         - systemInstructions
         - title
       properties:
-        systemInstructions:
-          type: string
-          description: System instructions for the AI agent
         title:
           type: string
           description: Agent title
@@ -2102,6 +2139,26 @@ components:
         model:
           type: string
           description: AI model to use
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          description: Temperature for response generation
+        maxTokens:
+          type: integer
+          description: Maximum tokens in the response
+        reasoning:
+          type: boolean
+          description: Whether the agent uses reasoning
+        useTools:
+          type: boolean
+          description: Whether the agent can use tools
+        systemInstructions:
+          type: string
+          description: System instructions for the AI agent
+        structuredAnswer:
+          type: string
+          description: Structured answer format (optional)
 
     AgentChatRequest:
       type: object
@@ -2119,12 +2176,13 @@ components:
               type: array
               description: Conversation history
               items:
-                type: object
+                $ref: "#/components/schemas/ChatMessage"
             files:
               type: array
-              description: File attachments
+              description: File attachments (File objects)
               items:
                 type: object
+                description: File object for attachment
             temperature:
               type: number
               minimum: 0
@@ -2151,9 +2209,10 @@ components:
           properties:
             files:
               type: array
-              description: File attachments
+              description: File attachments (File objects)
               items:
                 type: object
+                description: File object for attachment
             temperature:
               type: number
               minimum: 0
@@ -2202,22 +2261,18 @@ components:
           type: string
           format: uuid
           description: Unique identifier for the API key
-        key:
+        secret:
           type: string
-          description: The actual API key value
+          description: The actual API key secret value
         group:
           type: string
           description: Group UUID associated with this key
+        owner:
+          type: string
+          description: Email of user who owns/created the key
         description:
           type: string
           description: Description of the API key
-        createdAt:
-          type: string
-          format: date-time
-          description: Creation timestamp
-        createdBy:
-          type: string
-          description: Email of user who created the key
 
     ApiKeyCreate:
       type: object
@@ -2247,17 +2302,12 @@ components:
           description: User display name
         group:
           type: string
-          description: Group UUID
-        role:
-          type: string
-          description: User role
-        active:
-          type: boolean
-          description: Whether the user account is active
-        createdAt:
-          type: string
-          format: date-time
-          description: Creation timestamp
+          description: Primary group UUID
+        groups:
+          type: array
+          items:
+            type: string
+          description: Array of group UUIDs the user belongs to
 
     UserCreate:
       type: object
@@ -2272,15 +2322,14 @@ components:
         name:
           type: string
           description: User display name
-        password:
-          type: string
-          description: User password (will be hashed)
         group:
           type: string
-          description: Group UUID
-        role:
-          type: string
-          description: User role
+          description: Primary group UUID
+        groups:
+          type: array
+          items:
+            type: string
+          description: Array of group UUIDs the user should belong to
 
     UserUpdate:
       type: object
@@ -2288,18 +2337,14 @@ components:
         name:
           type: string
           description: User display name
-        password:
-          type: string
-          description: New password (will be hashed)
         group:
           type: string
-          description: Group UUID
-        role:
-          type: string
-          description: User role
-        active:
-          type: boolean
-          description: Whether the user account is active
+          description: Primary group UUID
+        groups:
+          type: array
+          items:
+            type: string
+          description: Array of group UUIDs the user should belong to
 
     Group:
       type: object
@@ -2308,60 +2353,38 @@ components:
           type: string
           format: uuid
           description: Unique identifier for the group
-        name:
+        title:
           type: string
-          description: Group name
-        description:
-          type: string
-          description: Group description
-        createdAt:
-          type: string
-          format: date-time
-          description: Creation timestamp
-        modifiedAt:
-          type: string
-          format: date-time
-          description: Last modification timestamp
+          description: Group title
 
     GroupCreate:
       type: object
       required:
-        - name
+        - title
       properties:
-        name:
+        title:
           type: string
-          description: Group name
-        description:
-          type: string
-          description: Group description
+          description: Group title
 
     GroupUpdate:
       type: object
       properties:
-        name:
+        title:
           type: string
-          description: Group name
-        description:
-          type: string
-          description: Group description
+          description: Group title
 
     Template:
       type: object
       properties:
         uuid:
           type: string
-          format: uuid
           description: Unique identifier for the template
-        mimetype:
+        description:
           type: string
-          description: MIME type of the template (e.g., text/typescript, text/javascript, application/json)
-        size:
-          type: integer
-          description: Size of the template file in bytes
+          description: Template description
       required:
         - uuid
-        - mimetype
-        - size
+        - description
 
     Breadcrumb:
       type: object
@@ -2376,6 +2399,74 @@ components:
       required:
         - uuid
         - title
+
+    DocInfo:
+      type: object
+      properties:
+        uuid:
+          type: string
+          description: Unique identifier for the documentation
+        description:
+          type: string
+          description: Documentation description
+      required:
+        - uuid
+        - description
+
+    ChatMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [user, model, tool]
+          description: Role of the message sender
+        parts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessagePart"
+          description: Array of message parts
+      required:
+        - role
+        - parts
+
+    ChatMessagePart:
+      type: object
+      properties:
+        text:
+          type: string
+          description: Text content of the message part
+        toolCall:
+          $ref: "#/components/schemas/ToolCall"
+        toolResponse:
+          $ref: "#/components/schemas/ToolResponse"
+      description: Individual part of a chat message
+
+    ToolCall:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the tool being called
+        args:
+          type: object
+          additionalProperties: true
+          description: Arguments passed to the tool
+      required:
+        - name
+        - args
+
+    ToolResponse:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the tool that generated the response
+        text:
+          type: string
+          description: Response text from the tool
+      required:
+        - name
+        - text
 
 tags:
   - name: Authentication
@@ -2402,3 +2493,5 @@ tags:
     description: Template management operations
   - name: Aspects
     description: Aspect management operations
+  - name: Documentation
+    description: Documentation endpoints

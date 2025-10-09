@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/http/httputil"
@@ -29,22 +30,52 @@ type client struct {
 
 func (c *client) roundTrip(req *http.Request) (*http.Response, error) {
 	if c.debug {
-		dump, err := httputil.DumpRequestOut(req, true)
-		if err != nil {
-			fmt.Println("Error dumping request:", err)
+		contentType := req.Header.Get("Content-Type")
+		isMultipart := strings.Contains(contentType, "multipart/form-data") ||
+			strings.Contains(contentType, "multipart/mixed")
+
+		if isMultipart {
+			// For multipart requests, manually print headers without dumping body
+			fmt.Printf("\nRequest >>>>>\n\n%s %s\n", req.Method, req.URL.String())
+			for key, values := range req.Header {
+				for _, value := range values {
+					fmt.Printf("%s: %s\n", key, value)
+				}
+			}
+			fmt.Printf("\n<multipart body>\n")
 		} else {
-			fmt.Printf("\nRequest >>>>>\n\n%s\n", string(dump))
+			dump, err := httputil.DumpRequestOut(req, true)
+			if err != nil {
+				fmt.Println("Error dumping request:", err)
+			} else {
+				fmt.Printf("\nRequest >>>>>\n\n%s\n", string(dump))
+			}
 		}
 	}
 
 	resp, err := c.client.Do(req)
 
 	if c.debug && resp != nil {
-		dump, err := httputil.DumpResponse(resp, true)
-		if err != nil {
-			fmt.Println("Error dumping response:", err)
+		contentType := resp.Header.Get("Content-Type")
+		isMultipart := strings.Contains(contentType, "multipart/form-data") ||
+			strings.Contains(contentType, "multipart/mixed")
+
+		if isMultipart {
+			// For multipart responses, manually print headers without dumping body
+			fmt.Printf(">>>>> Response\n\n%s %s\n", resp.Proto, resp.Status)
+			for key, values := range resp.Header {
+				for _, value := range values {
+					fmt.Printf("%s: %s\n", key, value)
+				}
+			}
+			fmt.Printf("\n<multipart body>\n=====\n\n")
 		} else {
-			fmt.Printf(">>>>> Response\n\n%s\n=====\n\n", string(dump))
+			dump, err := httputil.DumpResponse(resp, true)
+			if err != nil {
+				fmt.Println("Error dumping response:", err)
+			} else {
+				fmt.Printf(">>>>> Response\n\n%s\n=====\n\n", string(dump))
+			}
 		}
 	}
 
@@ -137,7 +168,7 @@ func (c *client) ListNodes(parent string) ([]Node, error) {
 }
 
 func (c *client) CreateFolder(parent, name string) (*Node, error) {
-	newNode := Node{
+	newNode := NodeCreate{
 		Title:    name,
 		Parent:   parent,
 		Mimetype: "application/vnd.antbox.folder",
@@ -176,13 +207,18 @@ func (c *client) CreateFolder(parent, name string) (*Node, error) {
 	return &node, nil
 }
 
-func (c *client) CreateSmartFolder(parent, name string, filters any) (*Node, error) {
-	// Create the request payload with filters
-	payload := map[string]any{
-		"title":    name,
-		"parent":   parent,
-		"mimetype": "application/vnd.antbox.smartfolder",
-		"filters":  filters,
+func (c *client) CreateSmartFolder(parent, name string, filters NodeFilters) (*Node, error) {
+	// Create the request payload with filters - we need a custom struct since NodeCreate doesn't have filters
+	payload := struct {
+		Title    string      `json:"title"`
+		Parent   string      `json:"parent"`
+		Mimetype string      `json:"mimetype"`
+		Filters  NodeFilters `json:"filters"`
+	}{
+		Title:    name,
+		Parent:   parent,
+		Mimetype: "application/vnd.antbox.smartfolder",
+		Filters:  filters,
 	}
 
 	jsonNode, err := json.Marshal(payload)
@@ -305,67 +341,66 @@ func (c *client) ChangeNodeName(uuid, newName string) error {
 	return nil
 }
 
-func (c *client) CreateFile(path string, metadata map[string]any) (*Node, error) {
-
-	path, err := expandTilde(path)
+func (c *client) uploadMultipartFile(filePath string, metadata any, url string, expectedStatus int) (*bytes.Buffer, *multipart.Writer, error) {
+	filePath, err := expandTilde(filePath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	path, err = filepath.Abs(path)
+	filePath, err = filepath.Abs(filePath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	file, err := os.Open(path)
+	file, err := os.Open(filePath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer file.Close()
 
 	var requestBody bytes.Buffer
 	writer := multipart.NewWriter(&requestBody)
 
-	// Add the file
-	// part, err := writer.CreateFormFile("file", filepath.Base(path))
-	// if err != nil {
-	// 	return nil, err
-	// }
-	//
-	//
-
 	partHeader := textproto.MIMEHeader{}
-	partHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", filepath.Base(path)))
-	partHeader.Set("Content-Type", detectMimetype(path))
+	partHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", filepath.Base(filePath)))
+	partHeader.Set("Content-Type", detectMimetype(filePath))
 	part, err := writer.CreatePart(partHeader)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	_, err = io.Copy(part, file)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	if metadata == nil {
-		metadata = make(map[string]any)
-	}
+	if metadata != nil {
+		metadataJSON, err := json.Marshal(metadata)
+		if err != nil {
+			return nil, nil, err
+		}
 
-	metadataJSON, err := json.Marshal(metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	err = writer.WriteField("metadata", string(metadataJSON))
-	if err != nil {
-		return nil, err
+		err = writer.WriteField("metadata", string(metadataJSON))
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	err = writer.Close()
 	if err != nil {
+		return nil, nil, err
+	}
+
+	return &requestBody, writer, nil
+}
+
+func (c *client) CreateFile(path string, metadata NodeCreate) (*Node, error) {
+	requestBody, writer, err := c.uploadMultipartFile(path, metadata, c.ServerURL+"/nodes/-/upload", http.StatusCreated)
+	if err != nil {
 		return nil, err
 	}
 
-	requestBodyStr := requestBody.String()
-
-	req, err := http.NewRequest("POST", c.ServerURL+"/nodes/-/upload", &requestBody)
+	req, err := http.NewRequest("POST", c.ServerURL+"/nodes/-/upload", requestBody)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +415,7 @@ func (c *client) CreateFile(path string, metadata map[string]any) (*Node, error)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, NewHttpErrorWithRequestBody(resp, req, requestBodyStr)
+		return nil, NewHttpErrorWithRequestBody(resp, req, "<multipart body>")
 	}
 
 	var node Node
@@ -391,14 +426,51 @@ func (c *client) CreateFile(path string, metadata map[string]any) (*Node, error)
 	return &node, nil
 }
 
+func (c *client) CreateNode(node NodeCreate) (*Node, error) {
+	jsonData, err := json.Marshal(node)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", c.ServerURL+"/nodes", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	c.SetAuthHeader(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, NewHttpErrorWithRequestBody(resp, req, string(jsonData))
+	}
+
+	var result Node
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 func detectMimetype(path string) string {
 
-	if strings.HasSuffix(path, ".js") {
-		return "application/vnd.antbox.feature"
+	if strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".ts") {
+		return "application/javascript"
+	}
+
+	if strings.HasSuffix(path, ".json") {
+		return "application/json"
 	}
 
 	m, err := mimetype.DetectFile(path)
 	if err != nil {
+		slog.Error("failed to detect mimetype", "path", path, "error", err)
 		return "application/octet-stream"
 	}
 
@@ -406,44 +478,12 @@ func detectMimetype(path string) string {
 }
 
 func (c *client) UpdateFile(uuid, filePath string) (*Node, error) {
-	filePath, err := expandTilde(filePath)
+	requestBody, writer, err := c.uploadMultipartFile(filePath, nil, c.ServerURL+"/nodes/"+uuid+"/-/upload", http.StatusOK)
 	if err != nil {
 		return nil, err
 	}
 
-	filePath, err = filepath.Abs(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var requestBody bytes.Buffer
-	writer := multipart.NewWriter(&requestBody)
-
-	// Add the file
-	part, err := writer.CreateFormFile("file", filepath.Base(filePath))
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = io.Copy(part, file)
-	if err != nil {
-		return nil, err
-	}
-
-	err = writer.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	requestBodyStr := requestBody.String()
-
-	req, err := http.NewRequest("PUT", c.ServerURL+"/nodes/"+uuid+"/-/upload", &requestBody)
+	req, err := http.NewRequest("PUT", c.ServerURL+"/nodes/"+uuid+"/-/upload", requestBody)
 	if err != nil {
 		return nil, err
 	}
@@ -458,7 +498,7 @@ func (c *client) UpdateFile(uuid, filePath string) (*Node, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, NewHttpErrorWithRequestBody(resp, req, requestBodyStr)
+		return nil, NewHttpErrorWithRequestBody(resp, req, "<multipart body>")
 	}
 
 	var node Node
@@ -469,7 +509,39 @@ func (c *client) UpdateFile(uuid, filePath string) (*Node, error) {
 	return &node, nil
 }
 
-func (c *client) FindNodes(filters any, pageSize, pageToken int) (*NodeFilterResult, error) {
+func (c *client) UpdateNode(uuid string, metadata NodeUpdate) (*Node, error) {
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", c.ServerURL+"/nodes/"+uuid, bytes.NewBuffer(metadataJSON))
+	if err != nil {
+		return nil, err
+	}
+
+	c.SetAuthHeader(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, NewHttpErrorWithRequestBody(resp, req, string(metadataJSON))
+	}
+
+	var node Node
+	if err := json.NewDecoder(resp.Body).Decode(&node); err != nil {
+		return nil, err
+	}
+
+	return &node, nil
+}
+
+func (c *client) FindNodes(filters NodeFilters, pageSize, pageToken int) (*NodeFilterResult, error) {
 	if pageSize <= 0 {
 		pageSize = 20
 	}
@@ -630,7 +702,7 @@ func (c *client) GetBreadcrumbs(uuid string) ([]Node, error) {
 	return breadcrumbs, nil
 }
 
-func (c *client) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]any) (string, error) {
+func (c *client) ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]any) (ChatHistory, error) {
 	options := make(map[string]any)
 
 	if conversationID != "" && len(history) > 0 {
@@ -654,13 +726,13 @@ func (c *client) ChatWithAgent(agentUUID string, message string, conversationID 
 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	endpoint := fmt.Sprintf("/agents/%s/-/chat", agentUUID)
 	req, err := http.NewRequest("POST", c.ServerURL+endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	c.SetAuthHeader(req)
@@ -668,60 +740,97 @@ func (c *client) ChatWithAgent(agentUUID string, message string, conversationID 
 
 	resp, err := c.roundTrip(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", NewHttpErrorWithRequestBody(resp, req, string(jsonData))
+		return nil, NewHttpErrorWithRequestBody(resp, req, string(jsonData))
 	}
 
-	// Try to decode as array first (conversation history format)
-	var arrayResult []map[string]any
+	// Try to decode as ChatHistory format
+	var chatHistory ChatHistory
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
+	if err := json.Unmarshal(body, &chatHistory); err == nil {
+		return chatHistory, nil
+	}
+
+	// Try to decode as array of maps (legacy format)
+	var arrayResult []map[string]any
 	if err := json.Unmarshal(body, &arrayResult); err == nil {
-		// Response is an array of conversation messages
-		// Find the last model response
-		for i := len(arrayResult) - 1; i >= 0; i-- {
-			message := arrayResult[i]
-			if role, ok := message["role"].(string); ok && role == "model" {
-				if parts, ok := message["parts"].([]any); ok && len(parts) > 0 {
-					if part, ok := parts[0].(map[string]any); ok {
-						if text, ok := part["text"].(string); ok {
-							return text, nil
+		// Convert to ChatHistory format
+		var history ChatHistory
+		for _, msg := range arrayResult {
+			chatMsg := ChatMessage{}
+
+			if role, ok := msg["role"].(string); ok {
+				chatMsg.Role = ChatMessageRole(role)
+			}
+
+			if parts, ok := msg["parts"].([]any); ok {
+				for _, partAny := range parts {
+					if partMap, ok := partAny.(map[string]any); ok {
+						part := ChatMessagePart{}
+						if text, ok := partMap["text"].(string); ok {
+							part.Text = &text
 						}
+						if toolCall, ok := partMap["toolCall"].(map[string]any); ok {
+							tc := &ToolCall{}
+							if name, ok := toolCall["name"].(string); ok {
+								tc.Name = name
+							}
+							if args, ok := toolCall["args"].(map[string]interface{}); ok {
+								tc.Args = args
+							}
+							part.ToolCall = tc
+						}
+						if toolResponse, ok := partMap["toolResponse"].(map[string]any); ok {
+							tr := &ToolResponse{}
+							if name, ok := toolResponse["name"].(string); ok {
+								tr.Name = name
+							}
+							if text, ok := toolResponse["text"].(string); ok {
+								tr.Text = text
+							}
+							part.ToolResponse = tr
+						}
+						chatMsg.Parts = append(chatMsg.Parts, part)
 					}
 				}
 			}
+			history = append(history, chatMsg)
 		}
-		// If no model response found, return the whole array as JSON
-		responseJson, _ := json.MarshalIndent(arrayResult, "", "  ")
-		return string(responseJson), nil
+		return history, nil
 	}
 
 	// Try to decode as object (traditional format)
 	var objectResult map[string]any
 	if err := json.Unmarshal(body, &objectResult); err == nil {
-		// Extract the response message
+		// Convert single response to ChatHistory format
+		var history ChatHistory
 		if response, ok := objectResult["response"]; ok {
 			if responseStr, ok := response.(string); ok {
-				return responseStr, nil
+				chatMsg := ChatMessage{
+					Role: ChatMessageRoleModel,
+					Parts: []ChatMessagePart{
+						{Text: &responseStr},
+					},
+				}
+				history = append(history, chatMsg)
+				return history, nil
 			}
 		}
-		// Fallback to return the whole response as JSON string
-		responseJson, _ := json.MarshalIndent(objectResult, "", "  ")
-		return string(responseJson), nil
 	}
 
-	// If neither format works, return the raw response
-	return string(body), nil
+	// If all parsing fails, return empty history
+	return ChatHistory{}, nil
 }
 
-func (c *client) AnswerFromAgent(agentUUID string, query string, temperature *float64, maxTokens *int) (string, error) {
+func (c *client) AnswerFromAgent(agentUUID string, query string, temperature *float64, maxTokens *int) (ChatHistory, error) {
 	options := make(map[string]any)
 
 	if temperature != nil {
@@ -741,13 +850,13 @@ func (c *client) AnswerFromAgent(agentUUID string, query string, temperature *fl
 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	endpoint := fmt.Sprintf("/agents/%s/-/answer", agentUUID)
 	req, err := http.NewRequest("POST", c.ServerURL+endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	c.SetAuthHeader(req)
@@ -755,32 +864,49 @@ func (c *client) AnswerFromAgent(agentUUID string, query string, temperature *fl
 
 	resp, err := c.roundTrip(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", NewHttpErrorWithRequestBody(resp, req, string(jsonData))
+		return nil, NewHttpErrorWithRequestBody(resp, req, string(jsonData))
 	}
 
-	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
+	// Try to decode as ChatHistory format
+	var chatHistory ChatHistory
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
 	}
 
-	// Extract the response message
-	if response, ok := result["response"]; ok {
-		if responseStr, ok := response.(string); ok {
-			return responseStr, nil
+	if err := json.Unmarshal(body, &chatHistory); err == nil {
+		return chatHistory, nil
+	}
+
+	// Try to decode as object (traditional format)
+	var objectResult map[string]any
+	if err := json.Unmarshal(body, &objectResult); err == nil {
+		// Convert single response to ChatHistory format
+		var history ChatHistory
+		if response, ok := objectResult["response"]; ok {
+			if responseStr, ok := response.(string); ok {
+				chatMsg := ChatMessage{
+					Role: ChatMessageRoleModel,
+					Parts: []ChatMessagePart{
+						{Text: &responseStr},
+					},
+				}
+				history = append(history, chatMsg)
+				return history, nil
+			}
 		}
 	}
 
-	// Fallback to return the whole response as JSON string
-	responseJson, _ := json.MarshalIndent(result, "", "  ")
-	return string(responseJson), nil
+	// If all parsing fails, return empty history
+	return ChatHistory{}, nil
 }
 
-func (c *client) RagChat(message string, options map[string]any) (ChatResponse, error) {
+func (c *client) RagChat(message string, options map[string]any) (ChatHistory, error) {
 
 	payload := map[string]any{
 		"text": message,
@@ -792,12 +918,12 @@ func (c *client) RagChat(message string, options map[string]any) (ChatResponse, 
 
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		return ChatResponse{}, err
+		return nil, err
 	}
 
 	req, err := http.NewRequest("POST", c.ServerURL+"/agents/rag/-/chat", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return ChatResponse{}, err
+		return nil, err
 	}
 
 	c.SetAuthHeader(req)
@@ -805,67 +931,94 @@ func (c *client) RagChat(message string, options map[string]any) (ChatResponse, 
 
 	resp, err := c.roundTrip(req)
 	if err != nil {
-		return ChatResponse{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return ChatResponse{}, NewHttpErrorWithRequestBody(resp, req, string(jsonData))
+		return nil, NewHttpErrorWithRequestBody(resp, req, string(jsonData))
 	}
 
-	// Try to decode as array first (conversation history format)
-	var arrayResult []map[string]any
+	// Try to decode as ChatHistory format
+	var chatHistory ChatHistory
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return ChatResponse{}, err
+		return nil, err
 	}
 
+	if err := json.Unmarshal(body, &chatHistory); err == nil {
+		return chatHistory, nil
+	}
+
+	// Try to decode as array of maps (legacy format)
+	var arrayResult []map[string]any
 	if err := json.Unmarshal(body, &arrayResult); err == nil {
-		// Response is an array of conversation messages
-		// Find the last model response
-		for i := len(arrayResult) - 1; i >= 0; i-- {
-			message := arrayResult[i]
-			if role, ok := message["role"].(string); ok && role == "model" {
-				if parts, ok := message["parts"].([]any); ok && len(parts) > 0 {
-					if part, ok := parts[0].(map[string]any); ok {
-						if text, ok := part["text"].(string); ok {
-							return ChatResponse{
-								Text:    text,
-								History: arrayResult,
-							}, nil
+		// Convert to ChatHistory format
+		var history ChatHistory
+		for _, msg := range arrayResult {
+			chatMsg := ChatMessage{}
+
+			if role, ok := msg["role"].(string); ok {
+				chatMsg.Role = ChatMessageRole(role)
+			}
+
+			if parts, ok := msg["parts"].([]any); ok {
+				for _, partAny := range parts {
+					if partMap, ok := partAny.(map[string]any); ok {
+						part := ChatMessagePart{}
+						if text, ok := partMap["text"].(string); ok {
+							part.Text = &text
 						}
+						if toolCall, ok := partMap["toolCall"].(map[string]any); ok {
+							tc := &ToolCall{}
+							if name, ok := toolCall["name"].(string); ok {
+								tc.Name = name
+							}
+							if args, ok := toolCall["args"].(map[string]interface{}); ok {
+								tc.Args = args
+							}
+							part.ToolCall = tc
+						}
+						if toolResponse, ok := partMap["toolResponse"].(map[string]any); ok {
+							tr := &ToolResponse{}
+							if name, ok := toolResponse["name"].(string); ok {
+								tr.Name = name
+							}
+							if text, ok := toolResponse["text"].(string); ok {
+								tr.Text = text
+							}
+							part.ToolResponse = tr
+						}
+						chatMsg.Parts = append(chatMsg.Parts, part)
 					}
 				}
 			}
+			history = append(history, chatMsg)
 		}
-		// If no model response found, return the whole array
-
-		return ChatResponse{
-			History: arrayResult,
-		}, nil
+		return history, nil
 	}
 
 	// Try to decode as object (traditional format)
 	var objectResult map[string]any
 	if err := json.Unmarshal(body, &objectResult); err == nil {
-		// Extract the response message
+		// Convert single response to ChatHistory format
+		var history ChatHistory
 		if response, ok := objectResult["response"]; ok {
 			if responseStr, ok := response.(string); ok {
-				return ChatResponse{
-					Text:    responseStr,
-					History: arrayResult,
-				}, nil
+				chatMsg := ChatMessage{
+					Role: ChatMessageRoleModel,
+					Parts: []ChatMessagePart{
+						{Text: &responseStr},
+					},
+				}
+				history = append(history, chatMsg)
+				return history, nil
 			}
 		}
-		// Fallback to return the whole response
-		return ChatResponse{
-			History: arrayResult,
-		}, nil
 	}
 
-	return ChatResponse{
-		History: arrayResult,
-	}, nil
+	// If all parsing fails, return empty history
+	return ChatHistory{}, nil
 }
 
 func (c *client) CopyNode(uuid, parent, title string) (*Node, error) {
@@ -1157,7 +1310,7 @@ func (c *client) RunFeatureAsExtension(uuid string, params map[string]any) (stri
 
 	requestBodyStr := string(jsonData)
 
-	req, err := http.NewRequest("POST", c.ServerURL+"/features/"+uuid+"/-/run-ext", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", c.ServerURL+"/extensions/"+uuid+"/-/exec", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", err
 	}
@@ -1391,40 +1544,6 @@ func (c *client) ListAgents() ([]Agent, error) {
 	}
 
 	return agents, nil
-}
-
-func (c *client) CreateAgent(agent AgentCreate) (*Agent, error) {
-	jsonData, err := json.Marshal(agent)
-	if err != nil {
-		return nil, err
-	}
-
-	requestBodyStr := string(jsonData)
-
-	req, err := http.NewRequest("POST", c.ServerURL+"/agents", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, err
-	}
-
-	c.SetAuthHeader(req)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.roundTrip(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		return nil, NewHttpErrorWithRequestBody(resp, req, requestBodyStr)
-	}
-
-	var result Agent
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
 }
 
 func (c *client) GetAgent(uuid string) (*Agent, error) {
@@ -1867,6 +1986,32 @@ func (c *client) DeleteGroup(uuid string) error {
 }
 
 // Template operations
+func (c *client) ListTemplates() ([]Template, error) {
+	req, err := http.NewRequest("GET", c.ServerURL+"/templates", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	c.SetAuthHeader(req)
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, NewHttpErrorWithRequestBody(resp, req, "")
+	}
+
+	var templates []Template
+	if err := json.NewDecoder(resp.Body).Decode(&templates); err != nil {
+		return nil, err
+	}
+
+	return templates, nil
+}
+
 func (c *client) GetTemplate(uuid string) ([]byte, error) {
 	req, err := http.NewRequest("GET", c.ServerURL+"/templates/"+uuid, nil)
 	if err != nil {
@@ -1891,6 +2036,59 @@ func (c *client) GetTemplate(uuid string) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// Documentation operations
+func (c *client) ListDocs() ([]DocInfo, error) {
+	req, err := http.NewRequest("GET", c.ServerURL+"/docs", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	c.SetAuthHeader(req)
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, NewHttpErrorWithRequestBody(resp, req, "")
+	}
+
+	var docs []DocInfo
+	if err := json.NewDecoder(resp.Body).Decode(&docs); err != nil {
+		return nil, err
+	}
+
+	return docs, nil
+}
+
+func (c *client) GetDoc(uuid string) (string, error) {
+	req, err := http.NewRequest("GET", c.ServerURL+"/docs/"+uuid, nil)
+	if err != nil {
+		return "", err
+	}
+
+	c.SetAuthHeader(req)
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", NewHttpErrorWithRequestBody(resp, req, "")
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(data), nil
 }
 
 // Aspect operations
@@ -1918,40 +2116,6 @@ func (c *client) ListAspects() ([]Aspect, error) {
 	}
 
 	return aspects, nil
-}
-
-func (c *client) CreateAspect(aspect AspectCreate) (*Aspect, error) {
-	jsonData, err := json.Marshal(aspect)
-	if err != nil {
-		return nil, err
-	}
-
-	requestBodyStr := string(jsonData)
-
-	req, err := http.NewRequest("POST", c.ServerURL+"/aspects", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, err
-	}
-
-	c.SetAuthHeader(req)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.roundTrip(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		return nil, NewHttpErrorWithRequestBody(resp, req, requestBodyStr)
-	}
-
-	var result Aspect
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
 }
 
 func (c *client) GetAspect(uuid string) (*Aspect, error) {
@@ -2032,60 +2196,13 @@ func (c *client) ExportAspect(uuid string, format string) (any, error) {
 	return result, nil
 }
 
-func (c *client) UploadFeature(filePath string, metadata map[string]any) (*Feature, error) {
-	filePath, err := expandTilde(filePath)
+func (c *client) UploadAspect(filePath string) (*Aspect, error) {
+	requestBody, writer, err := c.uploadMultipartFile(filePath, nil, c.ServerURL+"/aspects/-/upload", http.StatusCreated)
 	if err != nil {
 		return nil, err
 	}
 
-	filePath, err = filepath.Abs(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var requestBody bytes.Buffer
-	writer := multipart.NewWriter(&requestBody)
-
-	// Add the file
-	partHeader := textproto.MIMEHeader{}
-	partHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", filepath.Base(filePath)))
-	partHeader.Set("Content-Type", "application/vnd.antbox.feature")
-	part, err := writer.CreatePart(partHeader)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = io.Copy(part, file)
-	if err != nil {
-		return nil, err
-	}
-
-	if metadata != nil {
-		metadataJSON, err := json.Marshal(metadata)
-		if err != nil {
-			return nil, err
-		}
-
-		err = writer.WriteField("metadata", string(metadataJSON))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	err = writer.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	requestBodyStr := requestBody.String()
-
-	req, err := http.NewRequest("POST", c.ServerURL+"/features/-/upload", &requestBody)
+	req, err := http.NewRequest("POST", c.ServerURL+"/aspects/-/upload", requestBody)
 	if err != nil {
 		return nil, err
 	}
@@ -2100,7 +2217,39 @@ func (c *client) UploadFeature(filePath string, metadata map[string]any) (*Featu
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, NewHttpErrorWithRequestBody(resp, req, requestBodyStr)
+		return nil, NewHttpErrorWithRequestBody(resp, req, "")
+	}
+
+	var result Aspect
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+func (c *client) UploadFeature(filePath string) (*Feature, error) {
+	requestBody, writer, err := c.uploadMultipartFile(filePath, nil, c.ServerURL+"/features/-/upload", http.StatusCreated)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", c.ServerURL+"/features/-/upload", requestBody)
+	if err != nil {
+		return nil, err
+	}
+
+	c.SetAuthHeader(req)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, NewHttpErrorWithRequestBody(resp, req, "<multipart body>")
 	}
 
 	var feature Feature
@@ -2111,60 +2260,13 @@ func (c *client) UploadFeature(filePath string, metadata map[string]any) (*Featu
 	return &feature, nil
 }
 
-func (c *client) UploadAspect(filePath string, metadata map[string]any) (*Aspect, error) {
-	filePath, err := expandTilde(filePath)
+func (c *client) UploadAgent(filePath string) (*Agent, error) {
+	requestBody, writer, err := c.uploadMultipartFile(filePath, nil, c.ServerURL+"/agents/-/upload", http.StatusCreated)
 	if err != nil {
 		return nil, err
 	}
 
-	filePath, err = filepath.Abs(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var requestBody bytes.Buffer
-	writer := multipart.NewWriter(&requestBody)
-
-	// Add the file
-	partHeader := textproto.MIMEHeader{}
-	partHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", filepath.Base(filePath)))
-	partHeader.Set("Content-Type", "application/vnd.antbox.aspect")
-	part, err := writer.CreatePart(partHeader)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = io.Copy(part, file)
-	if err != nil {
-		return nil, err
-	}
-
-	if metadata != nil {
-		metadataJSON, err := json.Marshal(metadata)
-		if err != nil {
-			return nil, err
-		}
-
-		err = writer.WriteField("metadata", string(metadataJSON))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	err = writer.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	requestBodyStr := requestBody.String()
-
-	req, err := http.NewRequest("POST", c.ServerURL+"/aspects/-/upload", &requestBody)
+	req, err := http.NewRequest("POST", c.ServerURL+"/agents/-/upload", requestBody)
 	if err != nil {
 		return nil, err
 	}
@@ -2179,15 +2281,15 @@ func (c *client) UploadAspect(filePath string, metadata map[string]any) (*Aspect
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		return nil, NewHttpErrorWithRequestBody(resp, req, requestBodyStr)
+		return nil, NewHttpErrorWithRequestBody(resp, req, "<multipart body>")
 	}
 
-	var aspect Aspect
-	if err := json.NewDecoder(resp.Body).Decode(&aspect); err != nil {
+	var agent Agent
+	if err := json.NewDecoder(resp.Body).Decode(&agent); err != nil {
 		return nil, err
 	}
 
-	return &aspect, nil
+	return &agent, nil
 }
 
 func expandTilde(path string) (string, error) {

@@ -60,9 +60,6 @@ var (
 func executor(in string) {
 	in = strings.TrimSpace(in)
 
-	// Add command to history (will be saved to disk)
-	addCommandToHistory(in)
-
 	parts := strings.Split(in, " ")
 	commandName := parts[0]
 	args := parts[1:]
@@ -81,6 +78,9 @@ func executor(in string) {
 	} else {
 		fmt.Println("Unknown command: " + commandName)
 	}
+
+	// Add command to history AFTER execution (so currentNode is updated)
+	addCommandToHistory(in)
 
 	fmt.Println("")
 }
@@ -162,6 +162,9 @@ func Start(serverURL, apiKey, root, jwt string, debug bool) {
 		fmt.Printf("Note: Could not restore previous session: %v\n", err)
 	}
 
+	// Show breadcrumbs on startup
+	showStartupBreadcrumbs()
+
 	// Initial ls
 	if cmd, ok := commands["ls"]; ok {
 		cmd.Execute([]string{})
@@ -177,6 +180,8 @@ func Start(serverURL, apiKey, root, jwt string, debug bool) {
 		}),
 		prompt.OptionCompletionWordSeparator(" "),
 		prompt.OptionMaxSuggestion(10),
+		// Integrate saved history for up/down arrow navigation
+		prompt.OptionHistory(cliHistory),
 		// Add custom key bindings for better completion control
 		prompt.OptionAddKeyBind(prompt.KeyBind{
 			Key: prompt.Escape,
@@ -208,7 +213,7 @@ func initializeCurrentNodeAndCacheData() {
 	// Initialize empty history
 	cliHistory = []string{}
 
-	// List current folder contents
+	// Load current folder contents
 	if nodes, err := client.ListNodes("--root--"); err == nil {
 		currentNodes = nodes
 	}
@@ -217,6 +222,30 @@ func initializeCurrentNodeAndCacheData() {
 	loadCachedData()
 
 	fmt.Println("✓ Ready")
+}
+
+// showStartupBreadcrumbs displays the current location path on startup
+func showStartupBreadcrumbs() {
+	breadcrumbs, err := client.GetBreadcrumbs(currentNode.UUID)
+	if err != nil {
+		// Fallback to simple display
+		fmt.Printf("\nCurrent location: %s\n", getCurrentFolderName())
+		return
+	}
+
+	// Build path from breadcrumbs
+	var pathParts []string
+	for _, node := range breadcrumbs {
+		if node.Title != "" {
+			pathParts = append(pathParts, node.Title)
+		}
+	}
+
+	if len(pathParts) == 0 {
+		fmt.Println("\nCurrent location: /")
+	} else {
+		fmt.Printf("\nCurrent location: /%s\n", strings.Join(pathParts, "/"))
+	}
 }
 
 // loadCachedData loads aspects, actions, extensions, and agents

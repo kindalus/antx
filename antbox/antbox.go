@@ -2,11 +2,6 @@ package antbox
 
 import "net/http"
 
-type ChatResponse struct {
-	Text    string
-	History []map[string]any
-}
-
 type Antbox interface {
 	// Authentication
 	Login() error
@@ -16,13 +11,15 @@ type Antbox interface {
 	GetNode(uuid string) (*Node, error)
 	ListNodes(parent string) ([]Node, error)
 	CreateFolder(parent, name string) (*Node, error)
-	CreateSmartFolder(parent, name string, filters any) (*Node, error)
+	CreateSmartFolder(parent, name string, filters NodeFilters) (*Node, error)
 	RemoveNode(uuid string) error
 	MoveNode(uuid, newParent string) error
 	ChangeNodeName(uuid, newName string) error
-	CreateFile(filePath string, metadata map[string]any) (*Node, error)
+	CreateFile(filePath string, metadata NodeCreate) (*Node, error)
 	UpdateFile(uuid, filePath string) (*Node, error)
-	FindNodes(filters any, pageSize, pageToken int) (*NodeFilterResult, error)
+	CreateNode(node NodeCreate) (*Node, error)
+	UpdateNode(uuid string, metadata NodeUpdate) (*Node, error)
+	FindNodes(filters NodeFilters, pageSize, pageToken int) (*NodeFilterResult, error)
 	EvaluateNode(uuid string) ([]Node, error)
 	DownloadNode(uuid, downloadPath string) error
 	GetBreadcrumbs(uuid string) ([]Node, error)
@@ -39,7 +36,7 @@ type Antbox interface {
 	ListExtensionFeatures() ([]Feature, error)
 	RunFeatureAsAction(uuid string, uuids []string) (map[string]any, error)
 	RunFeatureAsExtension(uuid string, params map[string]any) (string, error)
-	UploadFeature(filePath string, metadata map[string]any) (*Feature, error)
+	UploadFeature(filePath string) (*Feature, error)
 
 	// Action operations
 	ListActions() ([]Feature, error)
@@ -55,12 +52,12 @@ type Antbox interface {
 
 	// Agent operations
 	ListAgents() ([]Agent, error)
-	CreateAgent(agent AgentCreate) (*Agent, error)
+	UploadAgent(filePath string) (*Agent, error)
 	GetAgent(uuid string) (*Agent, error)
 	DeleteAgent(uuid string) error
-	ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]any) (string, error)
-	AnswerFromAgent(agentUUID string, query string, temperature *float64, maxTokens *int) (string, error)
-	RagChat(message string, options map[string]any) (ChatResponse, error)
+	ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]any) (ChatHistory, error)
+	AnswerFromAgent(agentUUID string, query string, temperature *float64, maxTokens *int) (ChatHistory, error)
+	RagChat(message string, options map[string]any) (ChatHistory, error)
 
 	// API Key operations
 	ListAPIKeys() ([]APIKey, error)
@@ -83,15 +80,20 @@ type Antbox interface {
 	DeleteGroup(uuid string) error
 
 	// Template operations
+	ListTemplates() ([]Template, error)
 	GetTemplate(uuid string) ([]byte, error)
 
 	// Aspect operations
 	ListAspects() ([]Aspect, error)
-	CreateAspect(aspect AspectCreate) (*Aspect, error)
+
 	GetAspect(uuid string) (*Aspect, error)
 	DeleteAspect(uuid string) error
 	ExportAspect(uuid string, format string) (any, error)
-	UploadAspect(filePath string, metadata map[string]any) (*Aspect, error)
+	UploadAspect(filePath string) (*Aspect, error)
+
+	// Documentation operations
+	ListDocs() ([]DocInfo, error)
+	GetDoc(uuid string) (string, error)
 }
 
 func NewClient(serverURL, apiKey, root, jwt string, debug bool) Antbox {

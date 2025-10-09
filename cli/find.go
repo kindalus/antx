@@ -85,7 +85,10 @@ func (c *FindCommand) Execute(args []string) {
 	fmt.Printf(" %-12s  %4s  %-12s  %-30s  %s\n", "UUID", "SIZE", "MODIFIED", "MIMETYPE", "TITLE")
 	fmt.Printf(" %-12s  %4s  %-12s  %-30s  %s\n", "----", "----", "--------", "--------", "-----")
 
-	for _, node := range result.Nodes {
+	// Sort nodes: directories first, then files, both alphabetically by title
+	sortedNodes := sortNodesForListing(result.Nodes)
+
+	for _, node := range sortedNodes {
 		// Format UUID (first 12 characters)
 		uuid := node.UUID
 		if len(uuid) > 12 {

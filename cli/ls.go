@@ -51,11 +51,14 @@ func (c *LsCommand) Execute(args []string) {
 
 	currentNodes = nodes
 
+	// Sort nodes: directories first, then files, both alphabetically by title
+	sortedNodes := sortNodesForListing(nodes)
+
 	// Print header
 	fmt.Printf(" %-12s  %4s  %-12s  %-30s  %s\n", "UUID", "SIZE", "MODIFIED", "MIMETYPE", "TITLE")
 	fmt.Printf(" %-12s  %4s  %-12s  %-30s  %s\n", "----", "----", "--------", "--------", "-----")
 
-	for _, node := range nodes {
+	for _, node := range sortedNodes {
 		// Format UUID (first 12 characters)
 		uuid := node.UUID
 		if len(uuid) > 12 {

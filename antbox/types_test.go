@@ -70,7 +70,7 @@ func TestNodeMarshalWithAllFields(t *testing.T) {
 		Parent:      "parent-uuid",
 		Owner:       "test-owner",
 		Group:       "test-group",
-		Permissions: permissions,
+		Permissions: *permissions,
 		Size:        1024,
 		CreatedAt:   "2024-01-01T00:00:00Z",
 		ModifiedAt:  "2024-01-01T00:00:00Z",
