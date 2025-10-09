@@ -50,14 +50,34 @@ func (c *LsCommand) Execute(args []string) {
 	}
 
 	currentNodes = nodes
-	for _, node := range nodes {
-		title := node.Title
 
-		if len(title) > 40 {
-			title = fmt.Sprintf("%s...", title[:37])
+	// Print header
+	fmt.Printf(" %-12s  %4s  %-12s  %-30s  %s\n", "UUID", "SIZE", "MODIFIED", "MIMETYPE", "TITLE")
+	fmt.Printf(" %-12s  %4s  %-12s  %-30s  %s\n", "----", "----", "--------", "--------", "-----")
+
+	for _, node := range nodes {
+		// Format UUID (first 12 characters)
+		uuid := node.UUID
+		if len(uuid) > 12 {
+			uuid = uuid[:12]
 		}
 
-		fmt.Printf(" %-40s  %-12s  %5s  %s\n", title, node.UUID, node.HumanReadableSize(), node.Mimetype)
+		// Format size with padding
+		size := node.HumanReadableSize()
+
+		// Format modified date
+		modifiedAt := formatModifiedDate(node.ModifiedAt)
+
+		// Format mimetype (max 30 characters with ellipsis)
+		mimetype := node.Mimetype
+		if len(mimetype) > 30 {
+			mimetype = fmt.Sprintf("%s...", mimetype[:27])
+		}
+
+		// Title is free form (no truncation)
+		title := node.Title
+
+		fmt.Printf(" %-12s  %4s  %-12s  %-30s  %s\n", uuid, size, modifiedAt, mimetype, title)
 	}
 }
 

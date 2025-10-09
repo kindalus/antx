@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/c-bata/go-prompt"
+	"github.com/kindalus/antx/antbox"
 )
 
 type FindCommand struct{}
@@ -26,14 +27,14 @@ func (c *FindCommand) Execute(args []string) {
 	}
 
 	searchText := strings.Join(args, " ")
-	var filters any
+	var filters antbox.NodeFilters
 
 	if !strings.Contains(searchText, ",") {
 		// Simple search: use title field for text search
 		filters = extractSingleFilter(searchText)
 	} else {
 		// Complex search: parse comma-separated criteria
-		var filterList [][]any
+		var filterList antbox.NodeFilters1D
 		parts := strings.Split(searchText, ",")
 
 		for _, part := range parts {
@@ -51,13 +52,13 @@ func (c *FindCommand) Execute(args []string) {
 			} else if len(tokens) == 3 {
 				// Exact match: field operator value
 				value := convertValue(tokens[2])
-				filter := []any{tokens[0], tokens[1], value}
+				filter := antbox.NodeFilter{tokens[0], antbox.FilterOperator(tokens[1]), value}
 				filterList = append(filterList, filter)
 			} else {
 				// More than 3 tokens: field operator "rest as value"
 				valueStr := strings.Join(tokens[2:], " ")
 				value := convertValue(valueStr)
-				filter := []any{tokens[0], tokens[1], value}
+				filter := antbox.NodeFilter{tokens[0], antbox.FilterOperator(tokens[1]), value}
 				filterList = append(filterList, filter)
 			}
 		}
@@ -81,12 +82,32 @@ func (c *FindCommand) Execute(args []string) {
 	}
 
 	fmt.Printf("Found %d nodes:\n", len(result.Nodes))
+	fmt.Printf(" %-12s  %4s  %-12s  %-30s  %s\n", "UUID", "SIZE", "MODIFIED", "MIMETYPE", "TITLE")
+	fmt.Printf(" %-12s  %4s  %-12s  %-30s  %s\n", "----", "----", "--------", "--------", "-----")
+
 	for _, node := range result.Nodes {
-		title := node.Title
-		if len(title) > 40 {
-			title = fmt.Sprintf("%s...", title[:37])
+		// Format UUID (first 12 characters)
+		uuid := node.UUID
+		if len(uuid) > 12 {
+			uuid = uuid[:12]
 		}
-		fmt.Printf(" %-40s  %-12s  %5s  %s\n", title, node.UUID, node.HumanReadableSize(), node.Mimetype)
+
+		// Format size with padding
+		size := node.HumanReadableSize()
+
+		// Format modified date
+		modifiedAt := formatModifiedDate(node.ModifiedAt)
+
+		// Format mimetype (max 30 characters with ellipsis)
+		mimetype := node.Mimetype
+		if len(mimetype) > 30 {
+			mimetype = fmt.Sprintf("%s...", mimetype[:27])
+		}
+
+		// Title is free form (no truncation)
+		title := node.Title
+
+		fmt.Printf(" %-12s  %4s  %-12s  %-30s  %s\n", uuid, size, modifiedAt, mimetype, title)
 	}
 }
 

@@ -4,9 +4,12 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/kindalus/antx/antbox"
 )
 
-func extractSingleFilter(searchText string) [][]any {
+func extractSingleFilter(searchText string) antbox.NodeFilters1D {
 	tokens := strings.Fields(searchText)
 
 	operators := []string{
@@ -28,10 +31,14 @@ func extractSingleFilter(searchText string) [][]any {
 	}
 
 	if len(tokens) >= 2 && slices.Contains(operators, tokens[1]) {
-		return [][]any{{tokens[0], tokens[1], strings.Join(tokens[2:], " ")}}
+		return antbox.NodeFilters1D{
+			antbox.NodeFilter{tokens[0], antbox.FilterOperator(tokens[1]), strings.Join(tokens[2:], " ")},
+		}
 	}
 
-	return [][]any{{":content", "~=", searchText}}
+	return antbox.NodeFilters1D{
+		antbox.NodeFilter{":content", antbox.FilterOperatorMatch, searchText},
+	}
 }
 
 func convertValue(valueStr string) any {
@@ -152,5 +159,30 @@ func cd(args []string) {
 func ls(args []string) {
 	if cmd, ok := commands["ls"]; ok {
 		cmd.Execute(args)
+	}
+}
+
+// formatModifiedDate formats a date string to local time with conditional year display
+// Format: "mmm dd HH:mm" for current year, "mmm dd  yyyy" for other years
+func formatModifiedDate(dateStr string) string {
+	if dateStr == "" {
+		return "N/A"
+	}
+
+	// Parse the ISO 8601 date string
+	parsedTime, err := time.Parse(time.RFC3339, dateStr)
+	if err != nil {
+		return "N/A"
+	}
+
+	// Convert to local time
+	localTime := parsedTime.Local()
+	currentYear := time.Now().Year()
+
+	// Format based on year
+	if localTime.Year() == currentYear {
+		return localTime.Format("Jan 02 15:04")
+	} else {
+		return localTime.Format("Jan 02  2006")
 	}
 }
