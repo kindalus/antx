@@ -79,6 +79,11 @@ func (c *LsCommand) Execute(args []string) {
 
 		// Title is free form (no truncation)
 		title := node.Title
+		if node.Mimetype == "application/vnd.antbox.folder" ||
+			node.Mimetype == "application/vnd.antbox.smartfolder" {
+			// Text in cyan
+			title = fmt.Sprintf("\x1b[38;2;62;146;204;1m%s\x1b[0m", title)
+		}
 
 		fmt.Printf(" %-12s  %4s  %-12s  %-30s  %s\n", uuid, size, modifiedAt, mimetype, title)
 	}

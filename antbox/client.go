@@ -1023,8 +1023,7 @@ func (c *client) RagChat(message string, options map[string]any) (ChatHistory, e
 
 func (c *client) CopyNode(uuid, parent, title string) (*Node, error) {
 	payload := map[string]string{
-		"parent": parent,
-		"title":  title,
+		"to": parent,
 	}
 
 	jsonData, err := json.Marshal(payload)

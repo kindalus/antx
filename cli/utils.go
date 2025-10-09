@@ -187,12 +187,12 @@ func sortNodesForListing(nodes []antbox.Node) []antbox.Node {
 
 	// Sort directories alphabetically by title
 	sort.Slice(directories, func(i, j int) bool {
-		return directories[i].Title < directories[j].Title
+		return strings.ToLower(directories[i].Title) < strings.ToLower(directories[j].Title)
 	})
 
 	// Sort files alphabetically by title
 	sort.Slice(files, func(i, j int) bool {
-		return files[i].Title < files[j].Title
+		return strings.ToLower(files[i].Title) < strings.ToLower(files[j].Title)
 	})
 
 	// Combine directories first, then files

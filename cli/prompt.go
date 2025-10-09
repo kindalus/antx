@@ -229,7 +229,7 @@ func showStartupBreadcrumbs() {
 	breadcrumbs, err := client.GetBreadcrumbs(currentNode.UUID)
 	if err != nil {
 		// Fallback to simple display
-		fmt.Printf("\nCurrent location: %s\n", getCurrentFolderName())
+		fmt.Printf("Current location: %s\n\n", getCurrentFolderName())
 		return
 	}
 
@@ -242,9 +242,9 @@ func showStartupBreadcrumbs() {
 	}
 
 	if len(pathParts) == 0 {
-		fmt.Println("\nCurrent location: /")
+		fmt.Printf("Current location: /\n\n")
 	} else {
-		fmt.Printf("\nCurrent location: /%s\n", strings.Join(pathParts, "/"))
+		fmt.Printf("Current location: /%s\n\n", strings.Join(pathParts, "/"))
 	}
 }
 
