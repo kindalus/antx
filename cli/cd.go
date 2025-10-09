@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	prompt "github.com/c-bata/go-prompt"
+	"github.com/kindalus/antx/antbox"
 )
 
 type CdCommand struct{}
@@ -18,37 +19,44 @@ func (c *CdCommand) GetDescription() string {
 
 func (c *CdCommand) Execute(args []string) {
 	if len(args) == 0 {
-		currentFolder = "--root--"
-		currentFolderName = "root"
+		// Go to root
+		currentNode = antbox.Node{
+			UUID:     "--root--",
+			Title:    "root",
+			Mimetype: "application/vnd.antbox.folder",
+		}
 	} else if args[0] == ".." {
-		if currentFolder == "--root--" {
-			return
+		// Go to parent
+		if currentNode.UUID == "--root--" {
+			return // Already at root
 		}
-		node, err := client.GetNode(currentFolder)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		currentFolder = node.Parent
-		if currentFolder == "--root--" {
-			currentFolderName = "root"
+		if currentNode.Parent == "" || currentNode.Parent == "--root--" {
+			// Parent is root
+			currentNode = antbox.Node{
+				UUID:     "--root--",
+				Title:    "root",
+				Mimetype: "application/vnd.antbox.folder",
+			}
 		} else {
-			parentNode, err := client.GetNode(currentFolder)
+			// Get parent node
+			parentNode, err := client.GetNode(currentNode.Parent)
 			if err != nil {
 				fmt.Println("Error:", err)
 				return
 			}
-			currentFolderName = parentNode.Title
+			currentNode = *parentNode
 		}
 	} else {
-		currentFolder = args[0]
-		node, err := client.GetNode(currentFolder)
+		// Go to specified node
+		node, err := client.GetNode(args[0])
 		if err != nil {
 			fmt.Println("Error:", err)
 			return
 		}
-		currentFolderName = node.Title
+		currentNode = *node
 	}
+
+	// List contents of new current folder
 	if cmd, ok := commands["ls"]; ok {
 		cmd.Execute([]string{})
 	}

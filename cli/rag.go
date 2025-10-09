@@ -75,7 +75,7 @@ func (c *RagCommand) Suggest(d prompt.Document) []prompt.Suggest {
 func (c *RagCommand) startInteractiveSession(useLocation bool) {
 	fmt.Println("Starting interactive RAG session")
 	if useLocation {
-		fmt.Printf("Using location context: %s\n", currentFolderName)
+		fmt.Printf("Using location context: %s\n", getCurrentFolderName())
 	}
 	fmt.Println("Type 'exit' or press Ctrl+D to exit the session.")
 	fmt.Println()
@@ -130,23 +130,73 @@ func (c *RagCommand) sendMessage(message string, history []map[string]any, useLo
 	options := make(map[string]any)
 
 	if useLocation {
-		options["parent"] = currentFolder
+		options["parent"] = currentNode.UUID
 	}
 
 	if history != nil {
 		options["history"] = history
 	}
 
-	response, err := client.RagChat(message, options)
+	chatHistory, err := client.RagChat(message, options)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return nil
 	}
 
-	result := markdown.Render(response.Text, 100, 11)
+	// Find the last model response from the chat history
+	var responseText string
+	for i := len(chatHistory) - 1; i >= 0; i-- {
+		msg := chatHistory[i]
+		if msg.Role == "model" {
+			for _, part := range msg.Parts {
+				if part.Text != nil {
+					responseText = *part.Text
+					break
+				}
+			}
+			if responseText != "" {
+				break
+			}
+		}
+	}
 
-	fmt.Printf("\033[32mAssistant:\033[0m %s\n", strings.Trim(string(result), " "))
-	return response.History
+	if responseText != "" {
+		result := markdown.Render(responseText, 100, 11)
+		fmt.Printf("\033[32mAssistant:\033[0m %s\n", strings.Trim(string(result), " "))
+	} else {
+		fmt.Println("\033[32mAssistant:\033[0m (no response)")
+	}
+
+	// Convert ChatHistory to []map[string]any for backward compatibility
+	var convertedHistory []map[string]any
+	for _, msg := range chatHistory {
+		parts := make([]any, len(msg.Parts))
+		for i, part := range msg.Parts {
+			partMap := make(map[string]any)
+			if part.Text != nil {
+				partMap["text"] = *part.Text
+			}
+			if part.ToolCall != nil {
+				partMap["toolCall"] = map[string]any{
+					"name": part.ToolCall.Name,
+					"args": part.ToolCall.Args,
+				}
+			}
+			if part.ToolResponse != nil {
+				partMap["toolResponse"] = map[string]any{
+					"name": part.ToolResponse.Name,
+					"text": part.ToolResponse.Text,
+				}
+			}
+			parts[i] = partMap
+		}
+		convertedHistory = append(convertedHistory, map[string]any{
+			"role":  string(msg.Role),
+			"parts": parts,
+		})
+	}
+
+	return convertedHistory
 }
 
 func init() {

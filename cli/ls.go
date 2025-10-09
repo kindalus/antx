@@ -22,7 +22,7 @@ func (c *LsCommand) Execute(args []string) {
 	if len(args) > 0 {
 		folder = args[0]
 	} else {
-		folder = currentFolder
+		folder = currentNode.UUID
 	}
 
 	var nodes []antbox.Node

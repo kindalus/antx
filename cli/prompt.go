@@ -45,10 +45,9 @@ import (
 // - status: Show cached data statistics
 
 var (
-	client            antbox.Antbox
-	currentFolder     = "--root--"
-	currentFolderName = "root"
-	currentNodes      []antbox.Node
+	client       antbox.Antbox
+	currentNode  antbox.Node
+	currentNodes []antbox.Node
 
 	// Cached data loaded at startup
 	cachedAspects    []antbox.Aspect
@@ -141,8 +140,8 @@ func Start(serverURL, apiKey, root, jwt string, debug bool) {
 		}
 	}
 
-	// Load cached data at startup
-	loadCachedData()
+	// Initialize current node and load cached data at startup
+	initializeCurrentNodeAndCacheData()
 
 	// Initial ls
 	if cmd, ok := commands["ls"]; ok {
@@ -154,7 +153,8 @@ func Start(serverURL, apiKey, root, jwt string, debug bool) {
 		completer,
 		prompt.OptionTitle("Antbox CLI"),
 		prompt.OptionLivePrefix(func() (string, bool) {
-			return fmt.Sprintf("%s # ", currentFolderName), true
+			folderName := getCurrentFolderName()
+			return fmt.Sprintf("%s # ", folderName), true
 		}),
 		prompt.OptionCompletionWordSeparator(" "),
 		prompt.OptionMaxSuggestion(10),
@@ -175,10 +175,30 @@ func Start(serverURL, apiKey, root, jwt string, debug bool) {
 	p.Run()
 }
 
-// loadCachedData loads aspects, actions, extensions, and agents at startup
-func loadCachedData() {
-	fmt.Print("Loading available resources... ")
+// initializeCurrentNodeAndCacheData initializes current node and loads cached data at startup
+func initializeCurrentNodeAndCacheData() {
+	fmt.Print("Initializing... ")
 
+	// Initialize current node (start at root)
+	currentNode = antbox.Node{
+		UUID:     "--root--",
+		Title:    "root",
+		Mimetype: "application/vnd.antbox.folder",
+	}
+
+	// List current folder contents
+	if nodes, err := client.ListNodes("--root--"); err == nil {
+		currentNodes = nodes
+	}
+
+	// Load cached data
+	loadCachedData()
+
+	fmt.Println("✓ Ready")
+}
+
+// loadCachedData loads aspects, actions, extensions, and agents
+func loadCachedData() {
 	var loaded []string
 	var failed []string
 
@@ -214,14 +234,9 @@ func loadCachedData() {
 		failed = append(failed, "agents")
 	}
 
-	if len(failed) == 0 {
-		fmt.Printf("done (%s)\n", strings.Join(loaded, ", "))
-	} else {
-		fmt.Printf("done with warnings\n")
-		if len(loaded) > 0 {
-			fmt.Printf("  Loaded: %s\n", strings.Join(loaded, ", "))
-		}
-		fmt.Printf("  Failed: %s\n", strings.Join(failed, ", "))
+	// Report results quietly during initialization
+	if len(failed) > 0 {
+		fmt.Printf(" ✗ Failed: %s", strings.Join(failed, ", "))
 	}
 }
 
@@ -298,6 +313,14 @@ func GetCachedExtensions() []antbox.Feature {
 // GetCachedAgents returns the cached list of agents
 func GetCachedAgents() []antbox.Agent {
 	return cachedAgents
+}
+
+// getCurrentFolderName returns the display name for the current folder
+func getCurrentFolderName() string {
+	if currentNode.UUID == "--root--" {
+		return "root"
+	}
+	return currentNode.Title
 }
 
 // GetCachedAspects returns the cached list of aspects

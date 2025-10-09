@@ -18,11 +18,11 @@ func (c *PwdCommand) GetDescription() string {
 }
 
 func (c *PwdCommand) Execute(args []string) {
-	breadcrumbs, err := client.GetBreadcrumbs(currentFolder)
+	breadcrumbs, err := client.GetBreadcrumbs(currentNode.UUID)
 	if err != nil {
 		fmt.Println("Error getting breadcrumbs:", err)
 		// Fallback to old behavior
-		fmt.Printf("%s  %s\n", currentFolder, currentFolderName)
+		fmt.Printf("%s  %s\n", currentNode.UUID, getCurrentFolderName())
 		return
 	}
 

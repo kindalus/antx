@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/c-bata/go-prompt"
+	"github.com/kindalus/antx/antbox"
 )
 
 type MksmartCommand struct{}
@@ -40,15 +41,19 @@ func (c *MksmartCommand) Execute(args []string) {
 	}
 
 	// Create the filter for the smart folder
-	var filters [][]any
+	var filters antbox.NodeFilters1D
 	if value != "" {
 		convertedValue := convertValue(value)
-		filters = [][]any{{field, operator, convertedValue}}
+		filters = antbox.NodeFilters1D{
+			antbox.NodeFilter{field, antbox.FilterOperator(operator), convertedValue},
+		}
 	} else {
-		filters = [][]any{{field, operator}}
+		filters = antbox.NodeFilters1D{
+			antbox.NodeFilter{field, antbox.FilterOperator(operator), nil},
+		}
 	}
 
-	_, err := client.CreateSmartFolder(currentFolder, name, filters)
+	_, err := client.CreateSmartFolder(currentNode.UUID, name, filters)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return

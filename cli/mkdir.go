@@ -30,7 +30,7 @@ func (c *MkdirCommand) Execute(args []string) {
 		fn = fn[1 : len(fn)-1]
 	}
 
-	_, err := client.CreateFolder(currentFolder, fn)
+	_, err := client.CreateFolder(currentNode.UUID, fn)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
