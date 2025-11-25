@@ -116,6 +116,32 @@ func (c *client) Login() error {
 	return nil
 }
 
+func (c *client) GetCurrentUser() (*User, error) {
+	req, err := http.NewRequest("GET", c.ServerURL+"/login/me", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	c.SetAuthHeader(req)
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, NewHttpErrorWithRequestBody(resp, req, "")
+	}
+
+	var user User
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
 func (c *client) GetNode(uuid string) (*Node, error) {
 	req, err := http.NewRequest("GET", c.ServerURL+"/nodes/"+uuid, nil)
 	if err != nil {

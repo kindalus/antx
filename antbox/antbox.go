@@ -6,6 +6,7 @@ type Antbox interface {
 	// Authentication
 	Login() error
 	SetAuthHeader(req *http.Request)
+	GetCurrentUser() (*User, error)
 
 	// Node operations
 	GetNode(uuid string) (*Node, error)

@@ -20,6 +20,14 @@ func (c *mockClient) Login() error {
 	return nil
 }
 
+func (c *mockClient) GetCurrentUser() (*antbox.User, error) {
+	return &antbox.User{
+		Email:  "test@example.com",
+		Name:   "Test User",
+		Groups: []string{"testers"},
+	}, nil
+}
+
 func (c *mockClient) GetNode(uuid string) (*antbox.Node, error) {
 	if uuid == "--root--" {
 		return &antbox.Node{UUID: "--root--", Title: "root", Parent: ""}, nil
@@ -1221,6 +1229,14 @@ type enhancedMockClient struct {
 
 func (c *enhancedMockClient) Login() error {
 	return nil
+}
+
+func (c *enhancedMockClient) GetCurrentUser() (*antbox.User, error) {
+	return &antbox.User{
+		Email:  "enhanced@example.com",
+		Name:   "Enhanced User",
+		Groups: []string{"enhanced"},
+	}, nil
 }
 
 func (c *enhancedMockClient) GetNode(uuid string) (*antbox.Node, error) {
