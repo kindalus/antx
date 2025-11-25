@@ -70,7 +70,7 @@ func (c *mockClient) UpdateFile(uuid, filePath string) (*antbox.Node, error) {
 	return &antbox.Node{UUID: uuid, Title: "updated-file.txt", Parent: "--root--"}, nil
 }
 
-func (c *mockClient) FindNodes(filters antbox.NodeFilters, pageSize, pageToken int) (*antbox.NodeFilterResult, error) {
+func (c *mockClient) FindNodes(filters string, pageSize, pageToken int) (*antbox.NodeFilterResult, error) {
 	return &antbox.NodeFilterResult{
 		Nodes:     []antbox.Node{{UUID: "found-uuid", Title: "found-node", Mimetype: "text/plain"}},
 		PageSize:  pageSize,
@@ -1288,7 +1288,7 @@ func (c *enhancedMockClient) UpdateFile(uuid, filePath string) (*antbox.Node, er
 	return &antbox.Node{UUID: uuid, Title: "updated-file.txt", Parent: "--root--"}, nil
 }
 
-func (c *enhancedMockClient) FindNodes(filters antbox.NodeFilters, pageSize, pageToken int) (*antbox.NodeFilterResult, error) {
+func (c *enhancedMockClient) FindNodes(filters string, pageSize, pageToken int) (*antbox.NodeFilterResult, error) {
 	return &antbox.NodeFilterResult{
 		Nodes:     []antbox.Node{{UUID: "found-uuid", Title: "found-node", Mimetype: "text/plain"}},
 		PageSize:  pageSize,

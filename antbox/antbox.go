@@ -19,7 +19,7 @@ type Antbox interface {
 	UpdateFile(uuid, filePath string) (*Node, error)
 	CreateNode(node NodeCreate) (*Node, error)
 	UpdateNode(uuid string, metadata NodeUpdate) (*Node, error)
-	FindNodes(filters NodeFilters, pageSize, pageToken int) (*NodeFilterResult, error)
+	FindNodes(filters string, pageSize, pageToken int) (*NodeFilterResult, error)
 	EvaluateNode(uuid string) ([]Node, error)
 	DownloadNode(uuid, downloadPath string) error
 	GetBreadcrumbs(uuid string) ([]Node, error)

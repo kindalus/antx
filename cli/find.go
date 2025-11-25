@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/c-bata/go-prompt"
-	"github.com/kindalus/antx/antbox"
 )
 
 type FindCommand struct{}
@@ -27,51 +26,8 @@ func (c *FindCommand) Execute(args []string) {
 	}
 
 	searchText := strings.Join(args, " ")
-	var filters antbox.NodeFilters
 
-	if !strings.Contains(searchText, ",") {
-		// Simple search: use title field for text search
-		filters = extractSingleFilter(searchText)
-	} else {
-		// Complex search: parse comma-separated criteria
-		var filterList antbox.NodeFilters1D
-		parts := strings.Split(searchText, ",")
-
-		for _, part := range parts {
-			part = strings.TrimSpace(part)
-			if part == "" {
-				continue
-			}
-
-			// Split by whitespace to get field, operator, value
-			tokens := strings.Fields(part)
-
-			if len(tokens) < 3 {
-				// Skip incomplete filters
-				continue
-			} else if len(tokens) == 3 {
-				// Exact match: field operator value
-				value := convertValue(tokens[2])
-				filter := antbox.NodeFilter{tokens[0], antbox.FilterOperator(tokens[1]), value}
-				filterList = append(filterList, filter)
-			} else {
-				// More than 3 tokens: field operator "rest as value"
-				valueStr := strings.Join(tokens[2:], " ")
-				value := convertValue(valueStr)
-				filter := antbox.NodeFilter{tokens[0], antbox.FilterOperator(tokens[1]), value}
-				filterList = append(filterList, filter)
-			}
-		}
-
-		if len(filterList) == 0 {
-			fmt.Println("No valid filters found in criteria")
-			return
-		}
-
-		filters = filterList
-	}
-
-	result, err := client.FindNodes(filters, 20, 1)
+	result, err := client.FindNodes(searchText, 20, 1)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return

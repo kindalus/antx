@@ -541,7 +541,7 @@ func (c *client) UpdateNode(uuid string, metadata NodeUpdate) (*Node, error) {
 	return &node, nil
 }
 
-func (c *client) FindNodes(filters NodeFilters, pageSize, pageToken int) (*NodeFilterResult, error) {
+func (c *client) FindNodes(filters string, pageSize, pageToken int) (*NodeFilterResult, error) {
 	if pageSize <= 0 {
 		pageSize = 20
 	}
