@@ -149,6 +149,33 @@ func TestLightrayAuthenticatorDeviceFlow(t *testing.T) {
 	}
 }
 
+func TestLightrayAuthenticatorDiscoveryHTMLResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/.well-known/openid-configuration" {
+			http.NotFound(w, r)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html;charset=utf-8")
+		_, _ = w.Write([]byte("<!DOCTYPE html><html><body>Lightray</body></html>"))
+	}))
+	defer server.Close()
+
+	authenticator := lightrayAuthenticator{httpClient: server.Client()}
+	_, err := authenticator.Authenticate(context.Background(), server.URL, "terminal-cli")
+	if err == nil {
+		t.Fatal("Authenticate returned nil error for HTML discovery response")
+	}
+
+	message := err.Error()
+	if !strings.Contains(message, "returned HTML instead of JSON") {
+		t.Fatalf("error %q did not explain HTML discovery response", message)
+	}
+	if !strings.Contains(message, "OAuth/device auth routes are not deployed") {
+		t.Fatalf("error %q did not mention missing OAuth/device auth routes", message)
+	}
+}
+
 func TestNewClientForStartOptionsUsesLightrayAPIURLAndToken(t *testing.T) {
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

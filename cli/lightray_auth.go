@@ -216,8 +216,8 @@ func (a lightrayAuthenticator) discover(ctx context.Context, baseURL string) (*l
 	}
 
 	var discovery lightrayDiscoveryDocument
-	if err := json.NewDecoder(resp.Body).Decode(&discovery); err != nil {
-		return nil, fmt.Errorf("failed to parse Lightray OpenID configuration: %w", err)
+	if err := decodeLightrayJSONResponse(resp, &discovery, "Lightray OpenID configuration"); err != nil {
+		return nil, err
 	}
 	if discovery.DeviceAuthorizationEndpoint == "" {
 		return nil, fmt.Errorf("Lightray OpenID configuration does not advertise device_authorization_endpoint")
@@ -252,8 +252,8 @@ func (a lightrayAuthenticator) startDeviceAuthorization(ctx context.Context, end
 	}
 
 	var deviceAuth lightrayDeviceAuthorizationResponse
-	if err := json.NewDecoder(resp.Body).Decode(&deviceAuth); err != nil {
-		return nil, fmt.Errorf("failed to parse Lightray device authorization response: %w", err)
+	if err := decodeLightrayJSONResponse(resp, &deviceAuth, "Lightray device authorization response"); err != nil {
+		return nil, err
 	}
 	if deviceAuth.DeviceCode == "" {
 		return nil, fmt.Errorf("Lightray device authorization response did not include device_code")
@@ -353,8 +353,8 @@ func (a lightrayAuthenticator) requestToken(ctx context.Context, endpoint, clien
 	}
 
 	var tokenResponse lightrayTokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
-		return "", fmt.Errorf("failed to parse Lightray token response: %w", err)
+	if err := decodeLightrayJSONResponse(resp, &tokenResponse, "Lightray token response"); err != nil {
+		return "", err
 	}
 	if tokenResponse.AccessToken == "" {
 		return "", fmt.Errorf("Lightray token response did not include access_token")
@@ -364,6 +364,25 @@ func (a lightrayAuthenticator) requestToken(ctx context.Context, endpoint, clien
 	}
 
 	return tokenResponse.AccessToken, nil
+}
+
+func decodeLightrayJSONResponse(resp *http.Response, target any, description string) error {
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", description, err)
+	}
+
+	trimmed := strings.TrimSpace(string(body))
+	contentType := resp.Header.Get("Content-Type")
+	if strings.Contains(strings.ToLower(contentType), "text/html") || strings.HasPrefix(trimmed, "<") {
+		return fmt.Errorf("%s returned HTML instead of JSON; this usually means the Lightray OAuth/device auth routes are not deployed, or the URL is not the Lightray origin", description)
+	}
+
+	if err := json.Unmarshal(body, target); err != nil {
+		return fmt.Errorf("failed to parse %s: %w", description, err)
+	}
+
+	return nil
 }
 
 func parseOAuthError(resp *http.Response) error {
