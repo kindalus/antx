@@ -290,7 +290,7 @@ func newClientForStartOptions(ctx context.Context, options StartOptions, output 
 
 	serverURL := options.ServerURL
 	jwt := options.JWT
-	if options.AuthLightray {
+	if options.Lightray {
 		apiURL, err := lightrayAPIURL(options.ServerURL)
 		if err != nil {
 			return nil, err

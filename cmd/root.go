@@ -19,7 +19,7 @@ var rootCmd = &cobra.Command{
 		root, _ := cmd.Flags().GetString("root")
 		jwt, _ := cmd.Flags().GetString("jwt")
 		debug, _ := cmd.Flags().GetBool("verbose")
-		authLightray, _ := cmd.Flags().GetBool("auth-lightray")
+		lightray, _ := cmd.Flags().GetBool("lightray")
 		lightrayClientID, _ := cmd.Flags().GetString("lightray-client-id")
 
 		options := cli.StartOptions{
@@ -28,7 +28,7 @@ var rootCmd = &cobra.Command{
 			Root:             root,
 			JWT:              jwt,
 			Debug:            debug,
-			AuthLightray:     authLightray,
+			Lightray:         lightray,
 			LightrayClientID: lightrayClientID,
 		}
 		if err := options.Validate(); err != nil {
@@ -51,7 +51,7 @@ func init() {
 	rootCmd.PersistentFlags().String("api-key", "", "API key for authentication")
 	rootCmd.PersistentFlags().String("root", "", "Root password for authentication")
 	rootCmd.PersistentFlags().String("jwt", "", "JWT token for authentication")
-	rootCmd.PersistentFlags().Bool("auth-lightray", false, "Authenticate through a Lightray browser/device flow and use <server url>/api")
+	rootCmd.PersistentFlags().Bool("lightray", false, "Authenticate through a Lightray browser/device flow and use <server url>/api")
 	rootCmd.PersistentFlags().String("lightray-client-id", cli.DefaultLightrayClientID(), "Lightray OAuth client ID for device authentication")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable debug mode")
 }

@@ -18,7 +18,7 @@ type StartOptions struct {
 	Root             string
 	JWT              string
 	Debug            bool
-	AuthLightray     bool
+	Lightray         bool
 	LightrayClientID string
 }
 
@@ -27,7 +27,7 @@ func (o StartOptions) Validate() error {
 		return fmt.Errorf("server URL is required")
 	}
 
-	if !o.AuthLightray {
+	if !o.Lightray {
 		return nil
 	}
 
@@ -42,7 +42,7 @@ func (o StartOptions) Validate() error {
 		conflicts = append(conflicts, "--jwt")
 	}
 	if len(conflicts) > 0 {
-		return fmt.Errorf("--auth-lightray cannot be used with %s", strings.Join(conflicts, ", "))
+		return fmt.Errorf("--lightray cannot be used with %s", strings.Join(conflicts, ", "))
 	}
 
 	return nil

@@ -188,8 +188,8 @@ func TestNewClientForStartOptionsUsesLightrayAPIURLAndToken(t *testing.T) {
 	defer server.Close()
 
 	client, err := newClientForStartOptions(context.Background(), StartOptions{
-		ServerURL:    server.URL,
-		AuthLightray: true,
+		ServerURL: server.URL,
+		Lightray:  true,
 	}, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("newClientForStartOptions returned error: %v", err)
@@ -206,9 +206,9 @@ func TestNewClientForStartOptionsUsesLightrayAPIURLAndToken(t *testing.T) {
 
 func TestStartOptionsValidateLightrayConflicts(t *testing.T) {
 	tests := []StartOptions{
-		{ServerURL: "https://vcrm.lightray.cloud", AuthLightray: true, APIKey: "key"},
-		{ServerURL: "https://vcrm.lightray.cloud", AuthLightray: true, Root: "password"},
-		{ServerURL: "https://vcrm.lightray.cloud", AuthLightray: true, JWT: "jwt"},
+		{ServerURL: "https://vcrm.lightray.cloud", Lightray: true, APIKey: "key"},
+		{ServerURL: "https://vcrm.lightray.cloud", Lightray: true, Root: "password"},
+		{ServerURL: "https://vcrm.lightray.cloud", Lightray: true, JWT: "jwt"},
 	}
 
 	for _, options := range tests {
