@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -140,12 +141,50 @@ func TestLightrayAuthenticatorDeviceFlow(t *testing.T) {
 		"Open this URL to authenticate with Lightray:",
 		server.URL + "/l/device?user_code=ABCD-EFGH",
 		"Code: ABCD-EFGH",
+		"Press Ctrl+C or Ctrl+D to abort.",
 		"Waiting for approval...",
 		"Lightray authentication complete.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("output did not contain %q:\n%s", want, text)
 		}
+	}
+}
+
+func TestLightrayAuthenticatorCtrlDAbort(t *testing.T) {
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/.well-known/openid-configuration":
+			writeJSON(t, w, map[string]string{
+				"device_authorization_endpoint": server.URL + "/oauth/device_authorization",
+				"token_endpoint":                server.URL + "/oauth/token",
+			})
+		case "/oauth/device_authorization":
+			writeJSON(t, w, map[string]any{
+				"device_code":               "device-code-123",
+				"user_code":                 "ABCD-EFGH",
+				"verification_uri_complete": server.URL + "/l/device?user_code=ABCD-EFGH",
+				"expires_in":                60,
+				"interval":                  1,
+			})
+		case "/oauth/token":
+			writeJSONStatus(t, w, http.StatusBadRequest, map[string]string{"error": "authorization_pending"})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	authenticator := lightrayAuthenticator{
+		httpClient:    server.Client(),
+		output:        &bytes.Buffer{},
+		keyboardInput: io.NopCloser(strings.NewReader("")),
+	}
+
+	_, err := authenticator.Authenticate(context.Background(), server.URL, "terminal-cli")
+	if !errors.Is(err, errLightrayAuthenticationAborted) {
+		t.Fatalf("Authenticate error = %v, want Ctrl+D abort", err)
 	}
 }
 

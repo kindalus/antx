@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,7 +9,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -55,11 +58,15 @@ func (e *lightrayOAuthError) Error() string {
 	return fmt.Sprintf("oauth request failed with HTTP %d", e.StatusCode)
 }
 
+var errLightrayAuthenticationAborted = errors.New("Lightray authentication aborted")
+
 type lightrayAuthenticator struct {
-	httpClient *http.Client
-	output     io.Writer
-	sleep      func(context.Context, time.Duration) error
-	now        func() time.Time
+	httpClient    *http.Client
+	output        io.Writer
+	keyboardInput io.ReadCloser
+	keyboardAbort bool
+	sleep         func(context.Context, time.Duration) error
+	now           func() time.Time
 }
 
 func defaultSleep(ctx context.Context, duration time.Duration) error {
@@ -103,7 +110,7 @@ func (a lightrayAuthenticator) nowFunc() func() time.Time {
 }
 
 func authenticateWithLightray(ctx context.Context, lightrayURL, clientID string, output io.Writer) (string, error) {
-	return lightrayAuthenticator{output: output}.Authenticate(ctx, lightrayURL, clientID)
+	return lightrayAuthenticator{output: output, keyboardAbort: true}.Authenticate(ctx, lightrayURL, clientID)
 }
 
 func (a lightrayAuthenticator) Authenticate(ctx context.Context, lightrayURL, clientID string) (string, error) {
@@ -133,7 +140,18 @@ func (a lightrayAuthenticator) Authenticate(ctx context.Context, lightrayURL, cl
 
 	a.printDeviceInstructions(deviceAuth)
 
-	return a.pollForToken(ctx, discovery.TokenEndpoint, clientID, deviceAuth)
+	pollCtx, stopKeyboardAbort, abortCh := a.withKeyboardAbort(ctx)
+	defer stopKeyboardAbort()
+
+	accessToken, err := a.pollForToken(pollCtx, discovery.TokenEndpoint, clientID, deviceAuth)
+	if err != nil {
+		if abortErr := readKeyboardAbortError(abortCh); abortErr != nil {
+			return "", abortErr
+		}
+		return "", err
+	}
+
+	return accessToken, nil
 }
 
 func normalizeLightrayBaseURL(raw string) (string, error) {
@@ -285,7 +303,76 @@ func (a lightrayAuthenticator) printDeviceInstructions(deviceAuth *lightrayDevic
 		fmt.Fprintln(out, "(verification URL was not provided by the server)")
 	}
 	fmt.Fprintf(out, "\nCode: %s\n", deviceAuth.UserCode)
+	fmt.Fprintln(out, "Press Ctrl+C or Ctrl+D to abort.")
 	fmt.Fprintln(out, "Waiting for approval...")
+}
+
+func (a lightrayAuthenticator) withKeyboardAbort(ctx context.Context) (context.Context, func(), <-chan error) {
+	input := a.keyboardInput
+	if input == nil && a.keyboardAbort {
+		openedInput, err := openKeyboardAbortInput()
+		if err != nil {
+			return ctx, func() {}, nil
+		}
+		input = openedInput
+	}
+	if input == nil {
+		return ctx, func() {}, nil
+	}
+
+	abortCtx, cancel := context.WithCancel(ctx)
+	abortCh := make(chan error, 1)
+	done := make(chan struct{})
+	var stopOnce sync.Once
+
+	stop := func() {
+		stopOnce.Do(func() {
+			close(done)
+			_ = input.Close()
+			cancel()
+		})
+	}
+
+	go func() {
+		reader := bufio.NewReader(input)
+		for {
+			_, err := reader.ReadString('\n')
+
+			select {
+			case <-done:
+				return
+			default:
+			}
+
+			if errors.Is(err, io.EOF) {
+				abortCh <- errLightrayAuthenticationAborted
+				cancel()
+				return
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	return abortCtx, stop, abortCh
+}
+
+func openKeyboardAbortInput() (io.ReadCloser, error) {
+	return os.OpenFile("/dev/tty", os.O_RDONLY, 0)
+}
+
+func readKeyboardAbortError(abortCh <-chan error) error {
+	if abortCh == nil {
+		return nil
+	}
+
+	select {
+	case err := <-abortCh:
+		return err
+	default:
+		return nil
+	}
 }
 
 func (a lightrayAuthenticator) pollForToken(ctx context.Context, endpoint, clientID string, deviceAuth *lightrayDeviceAuthorizationResponse) (string, error) {
