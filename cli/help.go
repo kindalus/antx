@@ -55,7 +55,7 @@ func (c *HelpCommand) Execute(args []string) {
 
 	// Define command categories
 	categories := map[string][]string{
-		"Navigation & Browsing": {"cd", "ls", "pwd", "find", "stat"},
+		"Navigation & Browsing": {"audit", "cd", "ls", "pwd", "find", "stat"},
 		"File Operations":       {"cp", "clone", "mv", "rename", "rm", "upload", "download"},
 		"Folder Management":     {"mkdir", "mksmart"},
 		"AI & Agents":           {"agents"},

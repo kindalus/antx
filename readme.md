@@ -44,6 +44,7 @@ Once connected, you can use the following commands to interact with Antbox:
 *   **`mv [node_uuid] [new_parent_uuid]`**: Move a file or folder to a new location.
 *   **`rename [node_uuid] [new_name]`**: Rename a file or folder.
 *   **`find [query]`**: Search for nodes based on a query.
+*   **`audit [node_uuid]`**: Show the audit history for a node.
 *   **`clone [node_uuid]`**: Clone a node in the same location.
 *   **`help`**: Display a list of available commands.
 *   **`exit`**: Exit the `antx` shell.

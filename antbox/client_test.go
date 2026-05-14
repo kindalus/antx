@@ -651,6 +651,36 @@ func TestDownloadNode(t *testing.T) {
 	}
 }
 
+func TestGetAuditLog(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/audit/node-uuid" {
+			t.Errorf("Expected to request '/audit/node-uuid', got %s", r.URL.Path)
+		}
+		if r.Method != "GET" {
+			t.Errorf("Expected 'GET' request, got '%s'", r.Method)
+		}
+		if got := r.URL.Query().Get("mimetype"); got != "application/pdf" {
+			t.Errorf("Expected mimetype query 'application/pdf', got %q", got)
+		}
+
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, `[{"streamId":"node-uuid","eventId":"event-uuid","eventType":"NodeUpdatedEvent","occurredOn":"2026-05-14T10:00:00Z","userEmail":"user@example.com","tenant":"default","payload":{"title":{"old":"A","new":"B"}},"sequence":2}]`)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "", "", "test-jwt", false)
+	events, err := client.GetAuditLog("node-uuid", "application/pdf")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(events) != 1 || events[0].EventType != "NodeUpdatedEvent" || events[0].Sequence != 2 {
+		t.Fatalf("Expected decoded audit event, got %#v", events)
+	}
+	if events[0].Payload["title"] == nil {
+		t.Fatalf("Expected payload to be decoded, got %#v", events[0].Payload)
+	}
+}
+
 func TestSupportedClientEndpoints(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.Method + " " + r.URL.Path

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/textproto"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -1557,6 +1558,33 @@ func (c *client) GetDoc(uuid string) (string, error) {
 	}
 
 	return string(data), nil
+}
+
+func (c *client) GetAuditLog(uuid, mimetype string) ([]AuditEvent, error) {
+	endpoint := fmt.Sprintf("/audit/%s?mimetype=%s", uuid, url.QueryEscape(mimetype))
+	req, err := http.NewRequest("GET", c.ServerURL+endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	c.SetAuthHeader(req)
+
+	resp, err := c.roundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, NewHttpErrorWithRequestBody(resp, req, "")
+	}
+
+	var events []AuditEvent
+	if err := json.NewDecoder(resp.Body).Decode(&events); err != nil {
+		return nil, err
+	}
+
+	return events, nil
 }
 
 func (c *client) UploadAgent(filePath string) (*Agent, error) {

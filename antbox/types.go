@@ -400,6 +400,18 @@ type DocInfo struct {
 	Description string `json:"description,omitempty"`
 }
 
+// AuditEvent represents a node audit event.
+type AuditEvent struct {
+	StreamID   string         `json:"streamId"`
+	EventID    string         `json:"eventId"`
+	EventType  string         `json:"eventType"`
+	OccurredOn string         `json:"occurredOn"`
+	UserEmail  string         `json:"userEmail"`
+	Tenant     string         `json:"tenant"`
+	Payload    map[string]any `json:"payload"`
+	Sequence   int            `json:"sequence"`
+}
+
 type HttpError struct {
 	StatusCode      int
 	Status          string

@@ -58,6 +58,9 @@ type Antbox interface {
 	// Documentation operations
 	ListDocs() ([]DocInfo, error)
 	GetDoc(uuid string) (string, error)
+
+	// Audit operations
+	GetAuditLog(uuid, mimetype string) ([]AuditEvent, error)
 }
 
 func NewClient(serverURL, apiKey, root, jwt string, debug bool) Antbox {

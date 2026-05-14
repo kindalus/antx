@@ -53,9 +53,9 @@ func (c *mockClient) GetCurrentUser() (*antbox.User, error) {
 
 func (c *mockClient) GetNode(uuid string) (*antbox.Node, error) {
 	if uuid == "--root--" {
-		return &antbox.Node{UUID: "--root--", Title: "root", Parent: ""}, nil
+		return &antbox.Node{UUID: "--root--", Title: "root", Parent: "", Mimetype: "application/vnd.antbox.folder"}, nil
 	}
-	return &antbox.Node{UUID: "test-uuid", Title: "test-title", Parent: "--root--"}, nil
+	return &antbox.Node{UUID: "test-uuid", Title: "test-title", Parent: "--root--", Mimetype: "application/pdf"}, nil
 }
 
 func (c *mockClient) ListNodes(parent string) ([]antbox.Node, error) {
@@ -239,6 +239,31 @@ func (c *mockClient) ListDocs() ([]antbox.DocInfo, error) {
 
 func (c *mockClient) GetDoc(uuid string) (string, error) {
 	return "# Test Documentation\n\nThis is test documentation content.", nil
+}
+
+func (c *mockClient) GetAuditLog(uuid, mimetype string) ([]antbox.AuditEvent, error) {
+	return []antbox.AuditEvent{
+		{
+			StreamID:   uuid,
+			EventID:    "event-1",
+			EventType:  "NodeUpdatedEvent",
+			OccurredOn: "2026-05-14T10:00:00Z",
+			UserEmail:  "user@example.com",
+			Tenant:     "default",
+			Payload:    map[string]any{"title": map[string]any{"old": "Old", "new": "New"}},
+			Sequence:   1,
+		},
+		{
+			StreamID:   uuid,
+			EventID:    "event-2",
+			EventType:  "NodeDeletedEvent",
+			OccurredOn: "2026-05-14T11:00:00Z",
+			UserEmail:  "admin@example.com",
+			Tenant:     "default",
+			Payload:    map[string]any{"deleted": true},
+			Sequence:   2,
+		},
+	}, nil
 }
 
 func TestExecutor(t *testing.T) {
@@ -463,6 +488,7 @@ func TestCommandSuggestions(t *testing.T) {
 		{"do", []string{"docs", "download"}},
 		{"te", []string{}},
 		{"ag", []string{"agents"}},
+		{"au", []string{"audit"}},
 		{"ac", []string{}},
 	}
 
@@ -504,7 +530,7 @@ func TestCommandSuggestionsMinLength(t *testing.T) {
 		{"m", 3}, // should match "mkdir", "mv", "mksmart"
 		{"c", 3}, // should match "cd", "clone", "cp"
 		{"e", 1}, // should match "exit"
-		{"a", 2}, // should match "agents", "aliases"
+		{"a", 3}, // should match "agents", "aliases", "audit"
 		{"h", 2}, // should match "help", "history"
 	}
 
@@ -949,7 +975,7 @@ func (c *enhancedMockClient) GetNode(uuid string) (*antbox.Node, error) {
 	} else if uuid == "--root--" {
 		return &antbox.Node{UUID: "--root--", Title: "root", Parent: ""}, nil
 	}
-	return &antbox.Node{UUID: "test-uuid", Title: "test-title", Parent: "--root--"}, nil
+	return &antbox.Node{UUID: "test-uuid", Title: "test-title", Parent: "--root--", Mimetype: "application/pdf"}, nil
 }
 
 func (c *enhancedMockClient) ListNodes(parent string) ([]antbox.Node, error) {
@@ -1136,6 +1162,10 @@ func (c *enhancedMockClient) GetDoc(uuid string) (string, error) {
 	return "# Test Documentation\n\nThis is test documentation content.", nil
 }
 
+func (c *enhancedMockClient) GetAuditLog(uuid, mimetype string) ([]antbox.AuditEvent, error) {
+	return (&mockClient{}).GetAuditLog(uuid, mimetype)
+}
+
 func TestSmartfolderCdAndLsBehavior(t *testing.T) {
 	originalClient := client
 	defer func() { client = originalClient }()
@@ -1253,6 +1283,7 @@ func TestCommandExecuteCoverageForNonInteractiveCommands(t *testing.T) {
 		{"status", func() { (&StatusCommand{}).Execute(nil) }, "Cached Resource Statistics"},
 		{"reload", func() { (&ReloadCommand{}).Execute(nil) }, "Successfully reloaded"},
 		{"docs", func() { (&DocsCommand{}).Execute(nil) }, "Available documents"},
+		{"audit", func() { (&AuditCommand{}).Execute([]string{"test-uuid"}) }, "NodeUpdatedEvent"},
 	}
 
 	for _, tt := range tests {
