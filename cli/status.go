@@ -22,7 +22,7 @@ func (c *StatusCommand) Execute(args []string) {
 		fmt.Println()
 		fmt.Println("Description:")
 		fmt.Println("  Display statistics about cached resources loaded at startup.")
-		fmt.Println("  Shows the number of aspects, actions, extensions, and agents")
+		fmt.Println("  Shows the number of agents")
 		fmt.Println("  currently available for auto-completion suggestions.")
 		fmt.Println()
 		fmt.Println("Example:")
@@ -30,9 +30,6 @@ func (c *StatusCommand) Execute(args []string) {
 		return
 	}
 
-	aspects := GetCachedAspects()
-	actions := GetCachedActions()
-	extensions := GetCachedExtensions()
 	agents := GetCachedAgents()
 
 	fmt.Println("Current Location:")
@@ -46,13 +43,10 @@ func (c *StatusCommand) Execute(args []string) {
 
 	fmt.Println("Cached Resource Statistics:")
 	fmt.Println("========================================")
-	fmt.Printf("  Aspects:    %d\n", len(aspects))
-	fmt.Printf("  Actions:    %d\n", len(actions))
-	fmt.Printf("  Extensions: %d\n", len(extensions))
-	fmt.Printf("  Agents:     %d\n", len(agents))
+	fmt.Printf("  Agents: %d\n", len(agents))
 	fmt.Println()
 
-	total := len(aspects) + len(actions) + len(extensions) + len(agents)
+	total := len(agents)
 	fmt.Printf("Total resources: %d\n", total)
 
 	// Show configuration information
@@ -105,7 +99,7 @@ func (c *StatusCommand) Execute(args []string) {
 		}
 	} else {
 		fmt.Println("  No active conversation sessions")
-		fmt.Println("  Start a conversation using 'chat' or 'rag' with -c <session_id>")
+		fmt.Println("  Start a conversation with /<agent_uuid> or ask once with @<agent_uuid>")
 	}
 
 	if total == 0 {

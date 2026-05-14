@@ -28,21 +28,13 @@ import (
 //
 // Available Commands:
 // - pwd: Show current path using breadcrumbs
-// - rag [options] [message]: RAG chat with optional location context
-//   Options: -l (location context)
-//   Interactive: If no message provided, enters interactive session (exit with 'exit' or Ctrl+D)
-// - chat [options] <agent_uuid> [message]: Chat with specific agent (always interactive)
-//   Options: -t <temperature>, -m <max_tokens>
-//   Interactive: Always enters interactive session. Message is sent first if provided. (exit with 'exit' or Ctrl+D)
-// - answer [options] <agent_uuid> <question>: Ask question to specific agent
-//   Options: -t <temperature>, -m <max_tokens>
-// - run <action_uuid> <node_uuid> [param=value...]: Run an action on a node with optional parameters
-// - call <extension_uuid> [param=value...]: Run an extension with optional parameters
-// - template <uuid>: Download a template to Downloads folder
+// - /[agent_uuid] [message]: Chat with a specific agent (always interactive)
+// - /<agent_uuid> [message]: Alternate unbracketed chat shortcut
+// - @[agent_uuid] <question>: Ask a specific agent for a single answer
+// - @<agent_uuid> <question>: Alternate unbracketed answer shortcut
 // - cp <source_uuid> <destination_uuid> [new_title]: Copy a node to another location
-// - duplicate <uuid>: Duplicate a node in the same location
-
-// - reload: Reload cached data from server (aspects, actions, extensions, agents)
+// - clone <uuid>: Clone a node in the same location
+// - reload: Reload cached data from server (agents)
 // - status: Show cached data statistics
 
 var (
@@ -52,14 +44,20 @@ var (
 	cliHistory   []string
 
 	// Cached data loaded at startup
-	cachedAspects    []antbox.Aspect
-	cachedActions    []antbox.Feature
-	cachedExtensions []antbox.Feature
-	cachedAgents     []antbox.Agent
+	cachedAgents []antbox.Agent
 )
 
 func executor(in string) {
 	in = strings.TrimSpace(in)
+	if in == "" {
+		return
+	}
+
+	if executeAgentShortcut(in) {
+		addCommandToHistory(in)
+		fmt.Println("")
+		return
+	}
 
 	parts := strings.Split(in, " ")
 	commandName := parts[0]
@@ -86,8 +84,105 @@ func executor(in string) {
 	fmt.Println("")
 }
 
+func executeAgentShortcut(in string) bool {
+	mode, agentUUID, message, matched := parseAgentShortcut(in)
+	if !matched {
+		return false
+	}
+
+	switch mode {
+	case "chat":
+		if agentUUID == "" {
+			fmt.Println("Usage: /<agent_uuid> [message]")
+			fmt.Println("   or: /[agent_uuid] [message]")
+			return true
+		}
+		(&agentChatRunner{}).startInteractiveSession(agentUUID, message, nil, nil)
+	case "answer":
+		if agentUUID == "" || message == "" {
+			fmt.Println("Usage: @<agent_uuid> <question>")
+			fmt.Println("   or: @[agent_uuid] <question>")
+			return true
+		}
+		(&agentAnswerRunner{}).askAgent(agentUUID, message, nil, nil)
+	}
+
+	return true
+}
+
+func parseAgentShortcut(input string) (mode, agentUUID, message string, matched bool) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return "", "", "", false
+	}
+
+	marker := input[0]
+	switch marker {
+	case '/':
+		mode = "chat"
+	case '@':
+		mode = "answer"
+	default:
+		return "", "", "", false
+	}
+
+	remainder := strings.TrimSpace(input[1:])
+	if remainder == "" {
+		return mode, "", "", true
+	}
+
+	token, rest, hasRest := strings.Cut(remainder, " ")
+	token = strings.TrimSpace(token)
+	agentUUID = strings.TrimSuffix(strings.TrimPrefix(token, "["), "]")
+	if hasRest {
+		message = strings.TrimSpace(rest)
+	}
+
+	return mode, agentUUID, message, true
+}
+
+func getAgentShortcutSuggestions(d prompt.Document) []prompt.Suggest {
+	text := d.TextBeforeCursor()
+	if text == "" {
+		return []prompt.Suggest{}
+	}
+
+	marker := text[0]
+	if marker != '/' && marker != '@' {
+		return []prompt.Suggest{}
+	}
+
+	parts := strings.Fields(text)
+	if len(parts) > 1 || strings.HasSuffix(text, " ") {
+		return []prompt.Suggest{}
+	}
+
+	currentWord := strings.TrimPrefix(d.GetWordBeforeCursor(), string(marker))
+	currentWord = strings.TrimSuffix(strings.TrimPrefix(currentWord, "["), "]")
+
+	var suggests []prompt.Suggest
+	for _, agent := range GetCachedAgents() {
+		if strings.HasPrefix(strings.ToLower(agent.UUID), strings.ToLower(currentWord)) ||
+			strings.HasPrefix(strings.ToLower(agent.DisplayName()), strings.ToLower(currentWord)) {
+			description := "Chat with " + agent.DisplayName()
+			if marker == '@' {
+				description = "Ask " + agent.DisplayName()
+			}
+			suggests = append(suggests, prompt.Suggest{
+				Text:        fmt.Sprintf("%c[%s]", marker, agent.UUID),
+				Description: description,
+			})
+		}
+	}
+	return suggests
+}
+
 func completer(d prompt.Document) []prompt.Suggest {
 	text := d.TextBeforeCursor()
+
+	if strings.HasPrefix(text, "/") || strings.HasPrefix(text, "@") {
+		return getAgentShortcutSuggestions(d)
+	}
 
 	// Check if Tab was the last keystroke - if so, force show suggestions
 	if d.LastKeyStroke() == prompt.Tab || d.LastKeyStroke() == prompt.ControlI {
@@ -289,46 +384,12 @@ func showStartupBreadcrumbs() {
 	}
 }
 
-// loadCachedData loads aspects, actions, extensions, and agents
+// loadCachedData loads agents
 func loadCachedData() {
-	var loaded []string
-	var failed []string
-
-	// Load aspects
-	if aspects, err := client.ListAspects(); err == nil {
-		cachedAspects = aspects
-		loaded = append(loaded, fmt.Sprintf("%d aspects", len(aspects)))
-	} else {
-		failed = append(failed, "aspects")
-	}
-
-	// Load actions
-	if actions, err := client.ListActions(); err == nil {
-		cachedActions = actions
-		loaded = append(loaded, fmt.Sprintf("%d actions", len(actions)))
-	} else {
-		failed = append(failed, "actions")
-	}
-
-	// Load extensions
-	if extensions, err := client.ListExtensions(); err == nil {
-		cachedExtensions = extensions
-		loaded = append(loaded, fmt.Sprintf("%d extensions", len(extensions)))
-	} else {
-		failed = append(failed, "extensions")
-	}
-
-	// Load agents
 	if agents, err := client.ListAgents(); err == nil {
 		cachedAgents = agents
-		loaded = append(loaded, fmt.Sprintf("%d agents", len(agents)))
 	} else {
-		failed = append(failed, "agents")
-	}
-
-	// Report results quietly during initialization
-	if len(failed) > 0 {
-		fmt.Printf(" ✗ Failed: %s", strings.Join(failed, ", "))
+		fmt.Printf(" ✗ Failed: agents")
 	}
 }
 
@@ -336,70 +397,17 @@ func loadCachedData() {
 func reloadCachedData() error {
 	fmt.Print("Reloading resources from server... ")
 
-	var loaded []string
-	var failed []string
-	var errors []string
-
-	// Reload aspects
-	if aspects, err := client.ListAspects(); err == nil {
-		cachedAspects = aspects
-		loaded = append(loaded, fmt.Sprintf("%d aspects", len(aspects)))
-	} else {
-		failed = append(failed, "aspects")
-		errors = append(errors, fmt.Sprintf("aspects: %v", err))
-	}
-
-	// Reload actions
-	if actions, err := client.ListActions(); err == nil {
-		cachedActions = actions
-		loaded = append(loaded, fmt.Sprintf("%d actions", len(actions)))
-	} else {
-		failed = append(failed, "actions")
-		errors = append(errors, fmt.Sprintf("actions: %v", err))
-	}
-
-	// Reload extensions
-	if extensions, err := client.ListExtensions(); err == nil {
-		cachedExtensions = extensions
-		loaded = append(loaded, fmt.Sprintf("%d extensions", len(extensions)))
-	} else {
-		failed = append(failed, "extensions")
-		errors = append(errors, fmt.Sprintf("extensions: %v", err))
-	}
-
-	// Reload agents
-	if agents, err := client.ListAgents(); err == nil {
-		cachedAgents = agents
-		loaded = append(loaded, fmt.Sprintf("%d agents", len(agents)))
-	} else {
-		failed = append(failed, "agents")
-		errors = append(errors, fmt.Sprintf("agents: %v", err))
-	}
-
-	if len(failed) == 0 {
-		fmt.Printf("done (%s)\n", strings.Join(loaded, ", "))
-		return nil
-	} else {
+	agents, err := client.ListAgents()
+	if err != nil {
 		fmt.Printf("done with errors\n")
-		if len(loaded) > 0 {
-			fmt.Printf("  Successfully loaded: %s\n", strings.Join(loaded, ", "))
-		}
-		fmt.Printf("  Failed to load: %s\n", strings.Join(failed, ", "))
-		for _, errMsg := range errors {
-			fmt.Printf("    %s\n", errMsg)
-		}
-		return fmt.Errorf("%d resources failed to load", len(failed))
+		fmt.Printf("  Failed to load: agents\n")
+		fmt.Printf("    agents: %v\n", err)
+		return fmt.Errorf("failed to load agents")
 	}
-}
 
-// GetCachedActions returns the cached list of actions
-func GetCachedActions() []antbox.Feature {
-	return cachedActions
-}
-
-// GetCachedExtensions returns the cached list of extensions
-func GetCachedExtensions() []antbox.Feature {
-	return cachedExtensions
+	cachedAgents = agents
+	fmt.Printf("done (%d agents)\n", len(agents))
+	return nil
 }
 
 // GetCachedAgents returns the cached list of agents
@@ -430,9 +438,4 @@ func resolveAlias(arg string) string {
 	default:
 		return arg
 	}
-}
-
-// GetCachedAspects returns the cached list of aspects
-func GetCachedAspects() []antbox.Aspect {
-	return cachedAspects
 }

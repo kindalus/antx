@@ -23,7 +23,6 @@ func (c *CloneCommand) Execute(args []string) {
 		fmt.Println("Description:")
 		fmt.Println("  Create a clone of a node in the same location.")
 		fmt.Println("  The clone will have the same parent as the original.")
-		fmt.Println("  This is an alternative to the 'duplicate' command.")
 		fmt.Println()
 		fmt.Println("Arguments:")
 		fmt.Println("  uuid  UUID of the node to clone")
@@ -34,9 +33,6 @@ func (c *CloneCommand) Execute(args []string) {
 		fmt.Println("Examples:")
 		fmt.Println("  clone abc123-def456-ghi789")
 		fmt.Println("  clone .  # Clone current node")
-		fmt.Println()
-		fmt.Println("Note:")
-		fmt.Println("  This command performs the same operation as 'duplicate'.")
 		return
 	}
 
@@ -49,8 +45,8 @@ func (c *CloneCommand) Execute(args []string) {
 		return
 	}
 
-	// Perform the clone operation (uses the same API as duplicate)
-	clonedNode, err := client.DuplicateNode(nodeUUID)
+	// Perform the clone operation
+	clonedNode, err := client.CloneNode(nodeUUID)
 	if err != nil {
 		fmt.Printf("Error: Failed to clone node: %v\n", err)
 		return

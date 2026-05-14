@@ -29,9 +29,9 @@ func (c *AgentsCommand) Execute(args []string) {
 		return
 	}
 
-	// Sort agents alphabetically by title
+	// Sort agents alphabetically by display name
 	sort.Slice(agents, func(i, j int) bool {
-		return agents[i].Title < agents[j].Title
+		return agents[i].DisplayName() < agents[j].DisplayName()
 	})
 
 	fmt.Printf("Available agents (%d):\n", len(agents))
@@ -39,16 +39,17 @@ func (c *AgentsCommand) Execute(args []string) {
 
 	for _, agent := range agents {
 		fmt.Printf("UUID: %s\n", agent.UUID)
-		fmt.Printf("  Title: %s\n", agent.Title)
+		fmt.Printf("  Name: %s\n", agent.DisplayName())
 		if agent.Description != "" {
 			fmt.Printf("  Description: %s\n", agent.Description)
 		}
-		if agent.Temperature > 0 {
-			fmt.Printf("  Temperature: %.2f\n", agent.Temperature)
+		if agent.Model != "" {
+			fmt.Printf("  Model: %s\n", agent.Model)
 		}
-		if agent.MaxTokens > 0 {
-			fmt.Printf("  Max Tokens: %d\n", agent.MaxTokens)
+		if agent.MaxLlmCalls > 0 {
+			fmt.Printf("  Max LLM Calls: %d\n", agent.MaxLlmCalls)
 		}
+		fmt.Printf("  Exposed To Users: %v\n", agent.ExposedToUsers)
 		fmt.Println()
 	}
 }

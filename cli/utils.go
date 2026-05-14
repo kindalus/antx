@@ -32,8 +32,12 @@ func extractSingleFilter(searchText string) antbox.NodeFilters1D {
 	}
 
 	if len(tokens) >= 2 && slices.Contains(operators, tokens[1]) {
+		operator := antbox.FilterOperator(tokens[1])
+		if tokens[1] == "~=" {
+			operator = antbox.FilterOperatorMatch
+		}
 		return antbox.NodeFilters1D{
-			antbox.NodeFilter{tokens[0], antbox.FilterOperator(tokens[1]), strings.Join(tokens[2:], " ")},
+			antbox.NodeFilter{tokens[0], operator, strings.Join(tokens[2:], " ")},
 		}
 	}
 

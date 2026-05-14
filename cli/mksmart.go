@@ -29,6 +29,9 @@ func (c *MksmartCommand) Execute(args []string) {
 	name := args[0]
 	field := args[1]
 	operator := args[2]
+	if operator == "~=" {
+		operator = string(antbox.FilterOperatorMatch)
+	}
 
 	var value string
 	if len(args) > 3 {

@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"io"
 	"net/http"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -12,6 +14,27 @@ import (
 
 	prompt "github.com/c-bata/go-prompt"
 )
+
+func captureOutput(t *testing.T, fn func()) string {
+	t.Helper()
+
+	oldStdout := os.Stdout
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+
+	os.Stdout = writer
+	fn()
+	writer.Close()
+	os.Stdout = oldStdout
+
+	output, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("failed to read captured output: %v", err)
+	}
+	return string(output)
+}
 
 type mockClient struct {
 }
@@ -78,7 +101,7 @@ func (c *mockClient) UpdateFile(uuid, filePath string) (*antbox.Node, error) {
 	return &antbox.Node{UUID: uuid, Title: "updated-file.txt", Parent: "--root--"}, nil
 }
 
-func (c *mockClient) FindNodes(filters string, pageSize, pageToken int) (*antbox.NodeFilterResult, error) {
+func (c *mockClient) FindNodes(filters antbox.NodeFilters, pageSize, pageToken int) (*antbox.NodeFilterResult, error) {
 	return &antbox.NodeFilterResult{
 		Nodes:     []antbox.Node{{UUID: "found-uuid", Title: "found-node", Mimetype: "text/plain"}},
 		PageSize:  pageSize,
@@ -129,97 +152,29 @@ func (c *mockClient) AnswerFromAgent(agentUUID string, query string, temperature
 	}, nil
 }
 
-func (c *mockClient) RagChat(message string, options map[string]any) (antbox.ChatHistory, error) {
-	text := "Mock rag response"
-	return antbox.ChatHistory{
-		{
-			Role: antbox.ChatMessageRoleModel,
-			Parts: []antbox.ChatMessagePart{
-				{Text: &text},
-			},
-		},
-	}, nil
-}
-
 // New interface methods
 func (c *mockClient) CopyNode(uuid, parent, title string) (*antbox.Node, error) {
 	return &antbox.Node{UUID: "copied-uuid", Title: title, Parent: parent}, nil
 }
 
-func (c *mockClient) DuplicateNode(uuid string) (*antbox.Node, error) {
-	return &antbox.Node{UUID: "duplicated-uuid", Title: "Copy of test-title", Parent: "--root--"}, nil
+func (c *mockClient) CloneNode(uuid string) (*antbox.Node, error) {
+	return &antbox.Node{UUID: "cloned-uuid", Title: "Clone of test-title", Parent: "--root--"}, nil
 }
 
 func (c *mockClient) ExportNode(uuid string, format string) ([]byte, error) {
 	return []byte("exported content"), nil
 }
 
-func (c *mockClient) ListFeatures() ([]antbox.Feature, error) {
-	return []antbox.Feature{{UUID: "feature-uuid", Name: "Test Feature"}}, nil
-}
-
-func (c *mockClient) GetFeature(uuid string) (*antbox.Feature, error) {
-	return &antbox.Feature{UUID: uuid, Name: "Test Feature"}, nil
-}
-
-func (c *mockClient) DeleteFeature(uuid string) error {
-	return nil
-}
-
-func (c *mockClient) ExportFeature(uuid string, exportType string) (string, error) {
-	return "exported feature code", nil
-}
-
-func (c *mockClient) ListActionFeatures() ([]antbox.Feature, error) {
-	return []antbox.Feature{{UUID: "action-feature-uuid", Name: "Action Feature"}}, nil
-}
-
-func (c *mockClient) ListExtensionFeatures() ([]antbox.Feature, error) {
-	return []antbox.Feature{{UUID: "extension-feature-uuid", Name: "Extension Feature"}}, nil
-}
-
-func (c *mockClient) RunFeatureAsAction(uuid string, uuids []string) (map[string]any, error) {
-	return map[string]any{"result": "action executed"}, nil
-}
-
-func (c *mockClient) RunFeatureAsExtension(uuid string, params map[string]any) (string, error) {
-	return "<html>Extension response</html>", nil
-}
-
-func (c *mockClient) ListActions() ([]antbox.Feature, error) {
-	return []antbox.Feature{{UUID: "action-uuid", Name: "Test Action"}}, nil
-}
-
-func (c *mockClient) RunAction(uuid string, request antbox.ActionRunRequest) (map[string]any, error) {
-	return map[string]any{"result": "action executed"}, nil
-}
-
-func (c *mockClient) ListExtensions() ([]antbox.Feature, error) {
-	return []antbox.Feature{{UUID: "extension-uuid", Name: "Test Extension"}}, nil
-}
-
-func (c *mockClient) RunExtension(uuid string, data map[string]any) (any, error) {
-	return map[string]any{"result": "extension executed"}, nil
-}
-
-func (c *mockClient) ListAITools() ([]antbox.Feature, error) {
-	return []antbox.Feature{{UUID: "ai-tool-uuid", Name: "Test AI Tool"}}, nil
-}
-
-func (c *mockClient) RunAITool(uuid string, params map[string]any) (map[string]any, error) {
-	return map[string]any{"result": "ai tool executed"}, nil
-}
-
 func (c *mockClient) ListAgents() ([]antbox.Agent, error) {
-	return []antbox.Agent{{UUID: "agent-uuid", Title: "Test Agent"}}, nil
+	return []antbox.Agent{{UUID: "agent-uuid", Name: "Test Agent"}}, nil
 }
 
 func (c *mockClient) UploadAgent(filePath string) (*antbox.Agent, error) {
-	return &antbox.Agent{UUID: "agent-uuid", Title: "test-agent"}, nil
+	return &antbox.Agent{UUID: "agent-uuid", Name: "test-agent"}, nil
 }
 
 func (c *mockClient) GetAgent(uuid string) (*antbox.Agent, error) {
-	return &antbox.Agent{UUID: uuid, Title: "Test Agent"}, nil
+	return &antbox.Agent{UUID: uuid, Name: "Test Agent"}, nil
 }
 
 func (c *mockClient) DeleteAgent(uuid string) error {
@@ -274,44 +229,8 @@ func (c *mockClient) GetGroup(uuid string) (*antbox.Group, error) {
 	return &antbox.Group{UUID: uuid, Title: "Test Group"}, nil
 }
 
-func (c *mockClient) UpdateGroup(uuid string, group antbox.GroupUpdate) (*antbox.Group, error) {
-	return &antbox.Group{UUID: uuid, Title: "Updated Group"}, nil
-}
-
 func (c *mockClient) DeleteGroup(uuid string) error {
 	return nil
-}
-
-func (c *mockClient) ListTemplates() ([]antbox.Template, error) {
-	return []antbox.Template{{UUID: "template-uuid", Mimetype: "application/json"}}, nil
-}
-
-func (c *mockClient) GetTemplate(uuid string) ([]byte, error) {
-	return []byte("template content"), nil
-}
-
-func (c *mockClient) ListAspects() ([]antbox.Aspect, error) {
-	return []antbox.Aspect{{UUID: "aspect-uuid", Title: "Test Aspect"}}, nil
-}
-
-func (c *mockClient) GetAspect(uuid string) (*antbox.Aspect, error) {
-	return &antbox.Aspect{UUID: uuid, Title: "Test Aspect"}, nil
-}
-
-func (c *mockClient) DeleteAspect(uuid string) error {
-	return nil
-}
-
-func (c *mockClient) ExportAspect(uuid string, format string) (any, error) {
-	return map[string]any{"exported": "aspect"}, nil
-}
-
-func (c *mockClient) UploadFeature(filePath string) (*antbox.Feature, error) {
-	return &antbox.Feature{UUID: "uploaded-feature-uuid", Name: "TestFeature"}, nil
-}
-
-func (c *mockClient) UploadAspect(filePath string) (*antbox.Aspect, error) {
-	return &antbox.Aspect{UUID: "uploaded-aspect-uuid", Title: "test-aspect"}, nil
 }
 
 func (c *mockClient) ListDocs() ([]antbox.DocInfo, error) {
@@ -531,19 +450,20 @@ func TestCommandSuggestions(t *testing.T) {
 		{"mv", []string{}}, // exact matches return no suggestions
 		{"cd", []string{}}, // exact matches return no suggestions
 		{"up", []string{"upload"}},
-		{"ex", []string{"exec", "exit", "extensions"}},
+		{"ex", []string{"exit"}},
 		{"he", []string{"help"}},
 		{"pw", []string{"pwd"}},
 		{"st", []string{"stat", "status"}},
 		{"fi", []string{"find"}},
 		{"re", []string{"reload", "rename"}},
-		{"ch", []string{"chat"}},
-		{"an", []string{"answer"}},
-		{"ra", []string{"rag"}},
+		{"cl", []string{"clone"}},
+		{"ch", []string{}},
+		{"an", []string{}},
+		{"ra", []string{}},
 		{"do", []string{"docs", "download"}},
-		{"te", []string{"templates"}},
+		{"te", []string{}},
 		{"ag", []string{"agents"}},
-		{"ac", []string{"actions"}},
+		{"ac", []string{}},
 	}
 
 	for _, tc := range testCases {
@@ -580,11 +500,11 @@ func TestCommandSuggestionsMinLength(t *testing.T) {
 		expected int
 	}{
 		{"l", 1}, // should match "ls"
-		{"r", 5}, // should match "rm", "rename", "rag", "reload", "run"
+		{"r", 3}, // should match "rm", "rename", "reload"
 		{"m", 3}, // should match "mkdir", "mv", "mksmart"
-		{"c", 3}, // should match "cd", "chat", "cp"
-		{"e", 3}, // should match "exec", "exit", "extensions"
-		{"a", 4}, // should match "agents", "actions", "answer", "aliases"
+		{"c", 3}, // should match "cd", "clone", "cp"
+		{"e", 1}, // should match "exit"
+		{"a", 2}, // should match "agents", "aliases"
 		{"h", 2}, // should match "help", "history"
 	}
 
@@ -665,40 +585,6 @@ func TestUploadUpdateCommand(t *testing.T) {
 	}
 }
 
-func TestUploadFeatureCommand(t *testing.T) {
-	client = &mockClient{}
-
-	// Test that upload -f executes without error
-	uploadCmd := &UploadCommand{}
-
-	// This will call the mock client's UploadFeature method
-	// We can't easily test the output without complex mocking,
-	// but we can verify it doesn't panic or error
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("Upload feature command panicked: %v", r)
-		}
-	}()
-
-	uploadCmd.Execute([]string{"-f", "/path/to/feature.js"})
-}
-
-func TestUploadAspectCommand(t *testing.T) {
-	client = &mockClient{}
-
-	// Test that upload -a executes without error
-	uploadCmd := &UploadCommand{}
-
-	// This will call the mock client's UploadAspect method
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("Upload aspect command panicked: %v", r)
-		}
-	}()
-
-	uploadCmd.Execute([]string{"-a", "/path/to/aspect.xml"})
-}
-
 func TestUploadCommandFlags(t *testing.T) {
 	client = &mockClient{}
 
@@ -706,7 +592,7 @@ func TestUploadCommandFlags(t *testing.T) {
 	doc := createTestDocument("upload -")
 	suggests := completer(doc)
 
-	expectedFlags := []string{"-f", "-a", "-i", "-u"}
+	expectedFlags := []string{"-i", "-u"}
 	if len(suggests) != len(expectedFlags) {
 		t.Errorf("Expected %d flag suggestions, got %d", len(expectedFlags), len(suggests))
 	}
@@ -753,289 +639,95 @@ func TestCommandSuggestionsWithNewCommands(t *testing.T) {
 	}
 }
 
-func TestRunCommandSuggestions(t *testing.T) {
-	// Setup enhanced mock client with actions that have proper flags
-	client = &enhancedMockClient{}
-
-	// Load cached actions to simulate startup
-	actions, err := client.ListActions()
-	if err != nil {
-		t.Fatalf("Failed to get actions: %v", err)
-	}
-	cachedActions = actions
-
-	// Also set up some mock nodes for testing
-	currentNodes = []antbox.Node{
-		{UUID: "node-uuid", Title: "Test Node", Mimetype: "text/plain"},
-		{UUID: "folder-uuid", Title: "Test Folder", Mimetype: "application/vnd.antbox.folder"},
-	}
-
-	// Test action suggestion (first argument)
-	doc := createTestDocument("run a")
-	suggests := completer(doc)
-
-	// Should only suggest actions that are exposed as actions and can be run manually
-	if len(suggests) == 0 {
-		t.Errorf("Expected at least one action suggestion, got %d. Available actions: %v", len(suggests), cachedActions)
-	}
-
-	// Verify we only get the enabled action, not the disabled one
-	expectedActionUUID := "action-uuid"
-	foundExpectedAction := false
-	foundDisabledAction := false
-
-	for _, suggest := range suggests {
-		if suggest.Text == expectedActionUUID {
-			foundExpectedAction = true
-		}
-		if suggest.Text == "disabled-action-uuid" {
-			foundDisabledAction = true
-		}
-		if suggest.Text == "" {
-			t.Error("Action suggestion should not have empty text")
-		}
-		if suggest.Description == "" {
-			t.Error("Action suggestion should have a description")
+func TestRemovedCommandsAreNotRegistered(t *testing.T) {
+	removedCommands := []string{"actions", "answer", "chat", "duplicate", "exec", "extensions", "rag", "run", "templates"}
+	for _, name := range removedCommands {
+		if _, exists := commands[name]; exists {
+			t.Errorf("Expected %q command to be removed", name)
 		}
 	}
 
-	if !foundExpectedAction {
-		t.Error("Expected to find enabled action-uuid in suggestions")
+	if _, exists := commands["clone"]; !exists {
+		t.Error("Expected clone command to remain registered")
 	}
-	if foundDisabledAction {
-		t.Error("Should not suggest disabled action")
-	}
-
-	// Test node suggestion (second argument) - should use action filters
-	doc = createTestDocument("run action-uuid n")
-	suggests = completer(doc)
-
-	// Should suggest nodes (implementation depends on mock data)
-	// The key improvement is that it should filter nodes based on action filters
-	// For this test, we just verify that suggestions are returned
-	if len(suggests) == 0 {
-		t.Errorf("Expected node suggestions for second argument, got %d. Available nodes: %v", len(suggests), currentNodes)
-	}
-
-	// Test parameter suggestion (third+ arguments)
-	doc = createTestDocument("run action-uuid node-uuid f")
-	suggests = completer(doc)
-
-	// Should suggest parameters with '=' suffix that start with 'f'
-	foundParameterSuggestion := false
-	expectedFormatParam := "format="
-
-	for _, suggest := range suggests {
-		if strings.HasSuffix(suggest.Text, "=") {
-			foundParameterSuggestion = true
-		}
-	}
-
-	if !foundParameterSuggestion {
-		t.Errorf("Expected parameter suggestions with '=' suffix. Got suggestions: %v", suggests)
-	}
-
-	// Verify we get the format parameter (starts with 'f')
-	foundFormatParam := false
-	for _, suggest := range suggests {
-		if suggest.Text == expectedFormatParam {
-			foundFormatParam = true
-			break
-		}
-	}
-	if !foundFormatParam {
-		t.Errorf("Expected to find parameter '%s' in suggestions: %v", expectedFormatParam, suggests)
-	}
-
-	// Test parameter suggestion for 'q' prefix
-	doc = createTestDocument("run action-uuid node-uuid q")
-	suggests = completer(doc)
-
-	// Should suggest quality parameter (starts with 'q')
-	expectedQualityParam := "quality="
-	foundQualityParam := false
-	for _, suggest := range suggests {
-		if suggest.Text == expectedQualityParam {
-			foundQualityParam = true
-			break
-		}
-	}
-	if !foundQualityParam {
-		t.Errorf("Expected to find parameter '%s' in suggestions: %v", expectedQualityParam, suggests)
-	}
-}
-
-func TestRunCommandNodeSuggestions(t *testing.T) {
-	// Setup enhanced mock client with actions that have proper flags
-	client = &enhancedMockClient{}
-
-	// Load cached actions to simulate startup
-	actions, err := client.ListActions()
-	if err != nil {
-		t.Fatalf("Failed to get actions: %v", err)
-	}
-	cachedActions = actions
-
-	// Also set up some mock nodes for testing
-	currentNodes = []antbox.Node{
-		{UUID: "node-uuid-1", Title: "Test Node 1", Mimetype: "text/plain", CreatedAt: "2024-01-01T12:00:00Z", ModifiedAt: "2024-01-01T12:00:00Z"},
-		{UUID: "node-uuid-2", Title: "Test Node 2", Mimetype: "application/pdf", CreatedAt: "2024-01-01T12:00:00Z", ModifiedAt: "2024-01-01T12:00:00Z"},
-	}
-
-	// Test node suggestion (second argument) - start typing node name
-	doc := createTestDocument("run action-uuid n")
-	suggests := completer(doc)
-
-	// Should suggest nodes that start with 'n'
-	if len(suggests) == 0 {
-		t.Errorf("Expected node suggestions for 'run action-uuid n', got 0. Available nodes: %v", currentNodes)
-	}
-
-	// Verify we get node suggestions with proper UUIDs
-	foundNodeSuggestion := false
-	for _, suggest := range suggests {
-		if suggest.Text == "node-uuid-1" || suggest.Text == "node-uuid-2" {
-			foundNodeSuggestion = true
-			break
-		}
-	}
-
-	if !foundNodeSuggestion {
-		t.Errorf("Expected to find node UUID suggestions. Got suggestions: %v", suggests)
-	}
-
-	// Test with action UUID and typing first letter of node
-	doc = createTestDocument("run action-uuid no")
-	suggests = completer(doc)
-
-	if len(suggests) == 0 {
-		t.Errorf("Expected node suggestions for 'run action-uuid no', got 0")
-	}
-}
-
-func TestExecCommandRegistration(t *testing.T) {
-	// Test that exec command is properly registered
-	if _, exists := commands["exec"]; !exists {
-		t.Error("Expected exec command to be registered")
-	}
-
-	// Test that call command is no longer registered
-	if _, exists := commands["call"]; exists {
-		t.Error("Expected call command to be removed after rename to exec")
-	}
-
-	// Test exec command basic functionality
-	execCmd := commands["exec"]
-	if execCmd.GetName() != "exec" {
-		t.Errorf("Expected command name 'exec', got '%s'", execCmd.GetName())
-	}
-
-	if execCmd.GetDescription() != "Run an extension with optional parameters" {
-		t.Errorf("Unexpected description: %s", execCmd.GetDescription())
-	}
-}
-
-func TestRunCommandBehaviorDocumentation(t *testing.T) {
-	// This test documents the current behavior of the run command suggestions
-	// Setup enhanced mock client with actions
-	client = &enhancedMockClient{}
-
-	// Load cached actions to simulate startup
-	actions, err := client.ListActions()
-	if err != nil {
-		t.Fatalf("Failed to get actions: %v", err)
-	}
-	cachedActions = actions
-
-	// Set up some mock nodes for testing
-	currentNodes = []antbox.Node{
-		{UUID: "node-uuid-1", Title: "Test Node 1", Mimetype: "text/plain", CreatedAt: "2024-01-01T12:00:00Z", ModifiedAt: "2024-01-01T12:00:00Z"},
-		{UUID: "node-uuid-2", Title: "Test Node 2", Mimetype: "application/pdf", CreatedAt: "2024-01-01T12:00:00Z", ModifiedAt: "2024-01-01T12:00:00Z"},
-	}
-
-	// Test 1: Action suggestions work when typing partial action name
-	doc := createTestDocument("run act")
-	suggests := completer(doc)
-	if len(suggests) == 0 {
-		t.Error("Expected action suggestions for 'run act'")
-	}
-
-	// Test 2: Node suggestions work when typing partial node identifier
-	doc = createTestDocument("run action-uuid n")
-	suggests = completer(doc)
-	if len(suggests) == 0 {
-		t.Error("Expected node suggestions for 'run action-uuid n'")
-	}
-
-	// Test 3: Parameter suggestions work when typing partial parameter name
-	doc = createTestDocument("run action-uuid node-uuid-1 f")
-	suggests = completer(doc)
-	if len(suggests) == 0 {
-		t.Error("Expected parameter suggestions for 'run action-uuid node-uuid-1 f'")
-	}
-
-	// NOTE: The completer logic currently hides suggestions when text ends with
-	// a space and the previous word is longer than 2 characters. This is by design
-	// to avoid showing suggestions when the user has finished typing a complete argument.
-	// To see suggestions, users need to start typing the next argument.
-}
-
-func TestNewListCommands(t *testing.T) {
-	// Test that agents command is registered
 	if _, exists := commands["agents"]; !exists {
-		t.Error("Expected agents command to be registered")
+		t.Error("Expected agents command to remain registered")
+	}
+}
+
+func TestAgentShortcutParsing(t *testing.T) {
+	testCases := []struct {
+		input     string
+		mode      string
+		agentUUID string
+		message   string
+		matched   bool
+	}{
+		{"/agent-uuid hello there", "chat", "agent-uuid", "hello there", true},
+		{"/[agent-uuid] hello there", "chat", "agent-uuid", "hello there", true},
+		{"@agent-uuid what is this?", "answer", "agent-uuid", "what is this?", true},
+		{"@[agent-uuid] what is this?", "answer", "agent-uuid", "what is this?", true},
+		{"ls", "", "", "", false},
 	}
 
-	// Test that actions command is registered
-	if _, exists := commands["actions"]; !exists {
-		t.Error("Expected actions command to be registered")
+	for _, tc := range testCases {
+		mode, agentUUID, message, matched := parseAgentShortcut(tc.input)
+		if mode != tc.mode || agentUUID != tc.agentUUID || message != tc.message || matched != tc.matched {
+			t.Errorf("parseAgentShortcut(%q) = (%q, %q, %q, %v), want (%q, %q, %q, %v)", tc.input, mode, agentUUID, message, matched, tc.mode, tc.agentUUID, tc.message, tc.matched)
+		}
+	}
+}
+
+func TestAgentShortcutSuggestions(t *testing.T) {
+	cachedAgents = []antbox.Agent{
+		{UUID: "agent-uuid", Name: "Helper Agent"},
+		{UUID: "other-uuid", Name: "Other Agent"},
 	}
 
-	// Test that extensions command is registered
-	if _, exists := commands["extensions"]; !exists {
-		t.Error("Expected extensions command to be registered")
+	doc := createTestDocument("/agent")
+	suggests := completer(doc)
+	if len(suggests) != 1 || suggests[0].Text != "/[agent-uuid]" {
+		t.Fatalf("Expected slash shortcut suggestion for agent-uuid, got %v", suggests)
 	}
 
-	// Test command descriptions
+	doc = createTestDocument("@Helper")
+	suggests = completer(doc)
+	if len(suggests) != 1 || suggests[0].Text != "@[agent-uuid]" {
+		t.Fatalf("Expected answer shortcut suggestion for agent-uuid, got %v", suggests)
+	}
+}
+
+func TestListCommandsAfterRemoval(t *testing.T) {
 	if agentsCmd, exists := commands["agents"]; exists {
 		if agentsCmd.GetDescription() != "List all available agents" {
 			t.Errorf("Unexpected agents description: %s", agentsCmd.GetDescription())
 		}
-	}
-
-	if actionsCmd, exists := commands["actions"]; exists {
-		if actionsCmd.GetDescription() != "List all available actions" {
-			t.Errorf("Unexpected actions description: %s", actionsCmd.GetDescription())
-		}
-	}
-
-	if extensionsCmd, exists := commands["extensions"]; exists {
-		if extensionsCmd.GetDescription() != "List all available extensions" {
-			t.Errorf("Unexpected extensions description: %s", extensionsCmd.GetDescription())
-		}
+	} else {
+		t.Error("Expected agents command to be registered")
 	}
 }
 
 func TestUpdatedCommandOutputs(t *testing.T) {
-	// Test that updated commands have the correct behavior
 	client = &mockClient{}
 
-	// Test agents command doesn't include owner/model in output
 	agentsCmd := &AgentsCommand{}
 	if agentsCmd.GetDescription() != "List all available agents" {
 		t.Error("Agents command description incorrect")
 	}
+}
 
-	// Test actions command includes action-specific fields
-	actionsCmd := &ActionsCommand{}
-	if actionsCmd.GetDescription() != "List all available actions" {
-		t.Error("Actions command description incorrect")
+func TestExtractSingleFilterUsesOpenAPIMatchOperator(t *testing.T) {
+	filters := extractSingleFilter("title ~= document")
+	if len(filters) != 1 {
+		t.Fatalf("Expected one filter, got %#v", filters)
+	}
+	if filters[0][0] != "title" || filters[0][1] != antbox.FilterOperatorMatch || filters[0][2] != "document" {
+		t.Fatalf("Expected ~= to normalize to OpenAPI match operator, got %#v", filters[0])
 	}
 
-	// Test extensions command excludes action-specific fields
-	extensionsCmd := &ExtensionsCommand{}
-	if extensionsCmd.GetDescription() != "List all available extensions" {
-		t.Error("Extensions command description incorrect")
+	filters = extractSingleFilter("full text search")
+	if len(filters) != 1 || filters[0][0] != ":content" || filters[0][1] != antbox.FilterOperatorMatch || filters[0][2] != "full text search" {
+		t.Fatalf("Expected simple text search to become content match filter, got %#v", filters)
 	}
 }
 
@@ -1050,7 +742,7 @@ func TestFindCommandParsing(t *testing.T) {
 		{"title==Document", "title == Document"},
 		{"size>1000", "size > 1000"},
 		{"owner~=admin", "owner ~= admin"},
-		{"createdAt>=2023-01-01", "createdAt >= 2023-01-01"},
+		{"createdTime>=2023-01-01", "createdTime >= 2023-01-01"},
 		{"title == Document", "title == Document"}, // Already normalized
 	}
 
@@ -1304,7 +996,7 @@ func (c *enhancedMockClient) UpdateFile(uuid, filePath string) (*antbox.Node, er
 	return &antbox.Node{UUID: uuid, Title: "updated-file.txt", Parent: "--root--"}, nil
 }
 
-func (c *enhancedMockClient) FindNodes(filters string, pageSize, pageToken int) (*antbox.NodeFilterResult, error) {
+func (c *enhancedMockClient) FindNodes(filters antbox.NodeFilters, pageSize, pageToken int) (*antbox.NodeFilterResult, error) {
 	return &antbox.NodeFilterResult{
 		Nodes:     []antbox.Node{{UUID: "found-uuid", Title: "found-node", Mimetype: "text/plain"}},
 		PageSize:  pageSize,
@@ -1355,127 +1047,29 @@ func (c *enhancedMockClient) AnswerFromAgent(agentUUID string, query string, tem
 	}, nil
 }
 
-func (c *enhancedMockClient) RagChat(message string, options map[string]any) (antbox.ChatHistory, error) {
-	text := "Mock rag response"
-	return antbox.ChatHistory{
-		{
-			Role: antbox.ChatMessageRoleModel,
-			Parts: []antbox.ChatMessagePart{
-				{Text: &text},
-			},
-		},
-	}, nil
-}
-
 // New interface methods
 func (c *enhancedMockClient) CopyNode(uuid, parent, title string) (*antbox.Node, error) {
 	return &antbox.Node{UUID: "copied-uuid", Title: title, Parent: parent}, nil
 }
 
-func (c *enhancedMockClient) DuplicateNode(uuid string) (*antbox.Node, error) {
-	return &antbox.Node{UUID: "duplicated-uuid", Title: "Copy of test-title", Parent: "--root--"}, nil
+func (c *enhancedMockClient) CloneNode(uuid string) (*antbox.Node, error) {
+	return &antbox.Node{UUID: "cloned-uuid", Title: "Clone of test-title", Parent: "--root--"}, nil
 }
 
 func (c *enhancedMockClient) ExportNode(uuid string, format string) ([]byte, error) {
 	return []byte("exported content"), nil
 }
 
-func (c *enhancedMockClient) ListFeatures() ([]antbox.Feature, error) {
-	return []antbox.Feature{{UUID: "feature-uuid", Name: "Test Feature"}}, nil
-}
-
-func (c *enhancedMockClient) GetFeature(uuid string) (*antbox.Feature, error) {
-	return &antbox.Feature{UUID: uuid, Name: "Test Feature"}, nil
-}
-
-func (c *enhancedMockClient) DeleteFeature(uuid string) error {
-	return nil
-}
-
-func (c *enhancedMockClient) ExportFeature(uuid string, exportType string) (string, error) {
-	return "exported feature code", nil
-}
-
-func (c *enhancedMockClient) ListActionFeatures() ([]antbox.Feature, error) {
-	return []antbox.Feature{{UUID: "action-feature-uuid", Name: "Action Feature"}}, nil
-}
-
-func (c *enhancedMockClient) ListExtensionFeatures() ([]antbox.Feature, error) {
-	return []antbox.Feature{{UUID: "extension-feature-uuid", Name: "Extension Feature"}}, nil
-}
-
-func (c *enhancedMockClient) RunFeatureAsAction(uuid string, uuids []string) (map[string]any, error) {
-	return map[string]any{"result": "action executed"}, nil
-}
-
-func (c *enhancedMockClient) RunFeatureAsExtension(uuid string, params map[string]any) (string, error) {
-	return "<html>Extension response</html>", nil
-}
-
-func (c *enhancedMockClient) ListActions() ([]antbox.Feature, error) {
-	return []antbox.Feature{
-		{
-			UUID:           "action-uuid",
-			Name:           "Test Action",
-			Description:    "A test action for unit testing",
-			ExposeAsAction: true,
-			RunManually:    true,
-			Parameters: []antbox.Parameter{
-				{
-					Name:         "format",
-					Type:         "string",
-					Description:  "Output format",
-					Required:     false,
-					DefaultValue: "json",
-				},
-				{
-					Name:        "quality",
-					Type:        "int",
-					Description: "Quality level",
-					Required:    true,
-				},
-			},
-		},
-		{
-			UUID:           "disabled-action-uuid",
-			Name:           "Disabled Action",
-			Description:    "An action not exposed for manual run",
-			ExposeAsAction: false,
-			RunManually:    false,
-		},
-	}, nil
-}
-
-func (c *enhancedMockClient) RunAction(uuid string, request antbox.ActionRunRequest) (map[string]any, error) {
-	return map[string]any{"result": "action executed"}, nil
-}
-
-func (c *enhancedMockClient) ListExtensions() ([]antbox.Feature, error) {
-	return []antbox.Feature{{UUID: "extension-uuid", Name: "Test Extension"}}, nil
-}
-
-func (c *enhancedMockClient) RunExtension(uuid string, data map[string]any) (any, error) {
-	return map[string]any{"result": "extension executed"}, nil
-}
-
-func (c *enhancedMockClient) ListAITools() ([]antbox.Feature, error) {
-	return []antbox.Feature{{UUID: "ai-tool-uuid", Name: "Test AI Tool"}}, nil
-}
-
-func (c *enhancedMockClient) RunAITool(uuid string, params map[string]any) (map[string]any, error) {
-	return map[string]any{"result": "ai tool executed"}, nil
-}
-
 func (c *enhancedMockClient) ListAgents() ([]antbox.Agent, error) {
-	return []antbox.Agent{{UUID: "agent-uuid", Title: "Test Agent"}}, nil
+	return []antbox.Agent{{UUID: "agent-uuid", Name: "Test Agent"}}, nil
 }
 
 func (c *enhancedMockClient) UploadAgent(filePath string) (*antbox.Agent, error) {
-	return &antbox.Agent{UUID: "agent-uuid", Title: "test-agent"}, nil
+	return &antbox.Agent{UUID: "agent-uuid", Name: "test-agent"}, nil
 }
 
 func (c *enhancedMockClient) GetAgent(uuid string) (*antbox.Agent, error) {
-	return &antbox.Agent{UUID: uuid, Title: "Test Agent"}, nil
+	return &antbox.Agent{UUID: uuid, Name: "Test Agent"}, nil
 }
 
 func (c *enhancedMockClient) DeleteAgent(uuid string) error {
@@ -1530,44 +1124,8 @@ func (c *enhancedMockClient) GetGroup(uuid string) (*antbox.Group, error) {
 	return &antbox.Group{UUID: uuid, Title: "Test Group"}, nil
 }
 
-func (c *enhancedMockClient) UpdateGroup(uuid string, group antbox.GroupUpdate) (*antbox.Group, error) {
-	return &antbox.Group{UUID: uuid, Title: "Updated Group"}, nil
-}
-
 func (c *enhancedMockClient) DeleteGroup(uuid string) error {
 	return nil
-}
-
-func (c *enhancedMockClient) ListTemplates() ([]antbox.Template, error) {
-	return []antbox.Template{{UUID: "template-uuid", Mimetype: "application/json"}}, nil
-}
-
-func (c *enhancedMockClient) GetTemplate(uuid string) ([]byte, error) {
-	return []byte("template content"), nil
-}
-
-func (c *enhancedMockClient) ListAspects() ([]antbox.Aspect, error) {
-	return []antbox.Aspect{{UUID: "aspect-uuid", Title: "Test Aspect"}}, nil
-}
-
-func (c *enhancedMockClient) GetAspect(uuid string) (*antbox.Aspect, error) {
-	return &antbox.Aspect{UUID: uuid, Title: "Test Aspect"}, nil
-}
-
-func (c *enhancedMockClient) DeleteAspect(uuid string) error {
-	return nil
-}
-
-func (c *enhancedMockClient) ExportAspect(uuid string, format string) (any, error) {
-	return map[string]any{"exported": "aspect"}, nil
-}
-
-func (c *enhancedMockClient) UploadFeature(filePath string) (*antbox.Feature, error) {
-	return &antbox.Feature{UUID: "uploaded-feature-uuid", Name: "TestFeature"}, nil
-}
-
-func (c *enhancedMockClient) UploadAspect(filePath string) (*antbox.Aspect, error) {
-	return &antbox.Aspect{UUID: "uploaded-aspect-uuid", Title: "test-aspect"}, nil
 }
 
 func (c *enhancedMockClient) ListDocs() ([]antbox.DocInfo, error) {
@@ -1674,4 +1232,49 @@ func TestSmartfolderCdAndLsBehavior(t *testing.T) {
 			t.Errorf("Expected ListNodes NOT to be called when ls with smartfolder UUID, but it was")
 		}
 	})
+}
+
+func TestCommandExecuteCoverageForNonInteractiveCommands(t *testing.T) {
+	client = &mockClient{}
+	currentNode = antbox.Node{UUID: "--root--", Title: "root", Mimetype: "application/vnd.antbox.folder"}
+	currentNodes = []antbox.Node{{UUID: "test-uuid", Title: "test-title", Mimetype: "application/vnd.antbox.folder"}}
+	cachedAgents = []antbox.Agent{{UUID: "agent-uuid", Name: "Test Agent"}}
+
+	tests := []struct {
+		name     string
+		fn       func()
+		contains string
+	}{
+		{"agents", func() { (&AgentsCommand{}).Execute(nil) }, "Available agents"},
+		{"clone", func() { (&CloneCommand{}).Execute([]string{"test-uuid"}) }, "Node cloned successfully"},
+		{"find", func() { (&FindCommand{}).Execute([]string{"test"}) }, "Found"},
+		{"whoami", func() { (&WhoAmICommand{}).Execute(nil) }, "Current user"},
+		{"help", func() { (&HelpCommand{}).Execute(nil) }, "Agent shortcuts"},
+		{"status", func() { (&StatusCommand{}).Execute(nil) }, "Cached Resource Statistics"},
+		{"reload", func() { (&ReloadCommand{}).Execute(nil) }, "Successfully reloaded"},
+		{"docs", func() { (&DocsCommand{}).Execute(nil) }, "Available documents"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := captureOutput(t, tt.fn)
+			if !strings.Contains(output, tt.contains) {
+				t.Fatalf("expected output to contain %q, got %q", tt.contains, output)
+			}
+		})
+	}
+}
+
+func TestGetCommandsReturnsRegistry(t *testing.T) {
+	registered := GetCommands()
+	if registered["ls"] == nil || registered["agents"] == nil {
+		t.Fatalf("expected command registry to include ls and agents")
+	}
+}
+
+func TestStatJoinPermissions(t *testing.T) {
+	joined := joinPermissions([]antbox.Permission{antbox.PermissionRead, antbox.PermissionWrite})
+	if joined != "Read, Write" {
+		t.Fatalf("unexpected joined permissions: %q", joined)
+	}
 }

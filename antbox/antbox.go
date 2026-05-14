@@ -20,36 +20,13 @@ type Antbox interface {
 	UpdateFile(uuid, filePath string) (*Node, error)
 	CreateNode(node NodeCreate) (*Node, error)
 	UpdateNode(uuid string, metadata NodeUpdate) (*Node, error)
-	FindNodes(filters string, pageSize, pageToken int) (*NodeFilterResult, error)
+	FindNodes(filters NodeFilters, pageSize, pageToken int) (*NodeFilterResult, error)
 	EvaluateNode(uuid string) ([]Node, error)
 	DownloadNode(uuid, downloadPath string) error
 	GetBreadcrumbs(uuid string) ([]Node, error)
 	CopyNode(uuid, parent, title string) (*Node, error)
-	DuplicateNode(uuid string) (*Node, error)
+	CloneNode(uuid string) (*Node, error)
 	ExportNode(uuid string, format string) ([]byte, error)
-
-	// Feature operations
-	ListFeatures() ([]Feature, error)
-	GetFeature(uuid string) (*Feature, error)
-	DeleteFeature(uuid string) error
-	ExportFeature(uuid string, exportType string) (string, error)
-	ListActionFeatures() ([]Feature, error)
-	ListExtensionFeatures() ([]Feature, error)
-	RunFeatureAsAction(uuid string, uuids []string) (map[string]any, error)
-	RunFeatureAsExtension(uuid string, params map[string]any) (string, error)
-	UploadFeature(filePath string) (*Feature, error)
-
-	// Action operations
-	ListActions() ([]Feature, error)
-	RunAction(uuid string, request ActionRunRequest) (map[string]any, error)
-
-	// Extension operations
-	ListExtensions() ([]Feature, error)
-	RunExtension(uuid string, data map[string]any) (any, error)
-
-	// AI Tool operations
-	ListAITools() ([]Feature, error)
-	RunAITool(uuid string, params map[string]any) (map[string]any, error)
 
 	// Agent operations
 	ListAgents() ([]Agent, error)
@@ -58,7 +35,6 @@ type Antbox interface {
 	DeleteAgent(uuid string) error
 	ChatWithAgent(agentUUID string, message string, conversationID string, temperature *float64, maxTokens *int, history []map[string]any) (ChatHistory, error)
 	AnswerFromAgent(agentUUID string, query string, temperature *float64, maxTokens *int) (ChatHistory, error)
-	RagChat(message string, options map[string]any) (ChatHistory, error)
 
 	// API Key operations
 	ListAPIKeys() ([]APIKey, error)
@@ -77,20 +53,7 @@ type Antbox interface {
 	ListGroups() ([]Group, error)
 	CreateGroup(group GroupCreate) (*Group, error)
 	GetGroup(uuid string) (*Group, error)
-	UpdateGroup(uuid string, group GroupUpdate) (*Group, error)
 	DeleteGroup(uuid string) error
-
-	// Template operations
-	ListTemplates() ([]Template, error)
-	GetTemplate(uuid string) ([]byte, error)
-
-	// Aspect operations
-	ListAspects() ([]Aspect, error)
-
-	GetAspect(uuid string) (*Aspect, error)
-	DeleteAspect(uuid string) error
-	ExportAspect(uuid string, format string) (any, error)
-	UploadAspect(filePath string) (*Aspect, error)
 
 	// Documentation operations
 	ListDocs() ([]DocInfo, error)

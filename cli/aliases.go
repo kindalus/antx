@@ -30,7 +30,7 @@ func (c *AliasesCommand) Execute(args []string) {
 		fmt.Println()
 		fmt.Println("Examples:")
 		fmt.Println("  stat .           # Show info about current node")
-		fmt.Println("  run action-uuid .. # Run action on parent node")
+		fmt.Println("  cp . ..          # Copy current node to parent")
 		fmt.Println("  cd .             # Stay in current folder")
 		return
 	}

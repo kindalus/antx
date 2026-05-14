@@ -17,15 +17,13 @@ func (c *UploadCommand) GetName() string {
 }
 
 func (c *UploadCommand) GetDescription() string {
-	return "Upload a file to a folder, feature, or aspect"
+	return "Upload a file to a folder or agent"
 }
 
 func (c *UploadCommand) Execute(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: upload [-f|-a|-i|-u <uuid>] <file-path>")
-		fmt.Println("  -f: Upload as feature")
-		fmt.Println("  -a: Upload as aspect")
-		fmt.Println("  -i: Upload as AI agent")
+		fmt.Println("Usage: upload [-i|-u <uuid>] <file-path>")
+		fmt.Println("  -i: Upload AI agent JSON payload")
 		fmt.Println("  -u <uuid>: Upload with given uuid existing file")
 		return
 	}
@@ -39,12 +37,6 @@ func (c *UploadCommand) Execute(args []string) {
 	parsed := false
 	for argIndex < len(args) && !parsed {
 		switch args[argIndex] {
-		case "-f":
-			uploadType = "feature"
-			argIndex++
-		case "-a":
-			uploadType = "aspect"
-			argIndex++
 		case "-i":
 			uploadType = "agent"
 			argIndex++
@@ -57,6 +49,10 @@ func (c *UploadCommand) Execute(args []string) {
 			updateUUID = args[argIndex+1]
 			argIndex += 2
 		default:
+			if strings.HasPrefix(args[argIndex], "-") {
+				fmt.Printf("Unsupported upload option: %s\n", args[argIndex])
+				return
+			}
 			// Rest of args are file path
 			filePath = strings.Join(args[argIndex:], " ")
 			parsed = true
@@ -75,22 +71,6 @@ func (c *UploadCommand) Execute(args []string) {
 	fmt.Println("filePath:", filePath)
 
 	switch uploadType {
-	case "feature":
-		feature, err := client.UploadFeature(filePath)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		fmt.Printf("Feature %s uploaded successfully with UUID %s\n", filePath, feature.UUID)
-
-	case "aspect":
-		aspect, err := client.UploadAspect(filePath)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		fmt.Printf("Aspect %s uploaded successfully with UUID %s\n", filePath, aspect.UUID)
-
 	case "agent":
 		agent, err := client.UploadAgent(filePath)
 		if err != nil {
@@ -130,9 +110,7 @@ func (c *UploadCommand) Suggest(d prompt.Document) []prompt.Suggest {
 		word := d.GetWordBeforeCursor()
 		if strings.HasPrefix(word, "-") {
 			return []prompt.Suggest{
-				{Text: "-f", Description: "Upload as feature"},
-				{Text: "-a", Description: "Upload as aspect"},
-				{Text: "-i", Description: "Upload as AI agent"},
+				{Text: "-i", Description: "Upload AI agent JSON payload"},
 				{Text: "-u", Description: "Update existing file"},
 			}
 		}

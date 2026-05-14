@@ -42,8 +42,8 @@ func TestNodeMarshalOmitEmpty(t *testing.T) {
 		`"group"`,
 		`"permissions"`,
 		`"size"`,
-		`"createdAt"`,
-		`"modifiedAt"`,
+		`"createdTime"`,
+		`"modifiedTime"`,
 	}
 
 	for _, field := range omittedFields {
@@ -56,10 +56,10 @@ func TestNodeMarshalOmitEmpty(t *testing.T) {
 func TestNodeMarshalWithAllFields(t *testing.T) {
 	// Test with all fields populated
 	permissions := &Permissions{
-		Group:         []string{"admin"},
-		Authenticated: []string{"read", "write"},
-		Anonymous:     []string{"read"},
-		Advanced:      map[string]any{"custom": "value"},
+		Group:         []Permission{PermissionRead},
+		Authenticated: []Permission{PermissionRead, PermissionWrite},
+		Anonymous:     []Permission{PermissionRead},
+		Advanced:      map[string][]Permission{"custom": {PermissionExport}},
 	}
 
 	node := Node{
@@ -70,7 +70,7 @@ func TestNodeMarshalWithAllFields(t *testing.T) {
 		Parent:      "parent-uuid",
 		Owner:       "test-owner",
 		Group:       "test-group",
-		Permissions: *permissions,
+		Permissions: permissions,
 		Size:        1024,
 		CreatedAt:   "2024-01-01T00:00:00Z",
 		ModifiedAt:  "2024-01-01T00:00:00Z",
@@ -94,8 +94,8 @@ func TestNodeMarshalWithAllFields(t *testing.T) {
 		`"group":"test-group"`,
 		`"permissions":`,
 		`"size":1024`,
-		`"createdAt":"2024-01-01T00:00:00Z"`,
-		`"modifiedAt":"2024-01-01T00:00:00Z"`,
+		`"createdTime":"2024-01-01T00:00:00Z"`,
+		`"modifiedTime":"2024-01-01T00:00:00Z"`,
 	}
 
 	for _, field := range expectedFields {
@@ -124,8 +124,8 @@ func TestPermissionsOmitEmpty(t *testing.T) {
 
 	// Test with some fields populated
 	permissions = &Permissions{
-		Group:         []string{"admin"},
-		Authenticated: []string{"read"},
+		Group:         []Permission{PermissionRead},
+		Authenticated: []Permission{PermissionWrite},
 	}
 
 	jsonData, err = json.Marshal(permissions)
@@ -136,11 +136,11 @@ func TestPermissionsOmitEmpty(t *testing.T) {
 	jsonStr = string(jsonData)
 
 	// Check that only populated fields are present
-	if !strings.Contains(jsonStr, `"group":["admin"]`) {
+	if !strings.Contains(jsonStr, `"group":["Read"]`) {
 		t.Errorf("Expected group field not found in JSON: %s", jsonStr)
 	}
 
-	if !strings.Contains(jsonStr, `"authenticated":["read"]`) {
+	if !strings.Contains(jsonStr, `"authenticated":["Write"]`) {
 		t.Errorf("Expected authenticated field not found in JSON: %s", jsonStr)
 	}
 

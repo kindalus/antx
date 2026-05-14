@@ -21,12 +21,14 @@ const (
 
 // ToolCall represents a tool call in a chat message
 type ToolCall struct {
-	Name string                 `json:"name"`
-	Args map[string]interface{} `json:"args"`
+	ID   string         `json:"id,omitempty"`
+	Name string         `json:"name"`
+	Args map[string]any `json:"args"`
 }
 
 // ToolResponse represents a tool response in a chat message
 type ToolResponse struct {
+	ID   string `json:"id,omitempty"`
 	Name string `json:"name"`
 	Text string `json:"text"`
 }
@@ -57,7 +59,7 @@ const (
 	FilterOperatorLess         FilterOperator = "<"
 	FilterOperatorGreater      FilterOperator = ">"
 	FilterOperatorNotEqual     FilterOperator = "!="
-	FilterOperatorMatch        FilterOperator = "~="
+	FilterOperatorMatch        FilterOperator = "match"
 	FilterOperatorIn           FilterOperator = "in"
 	FilterOperatorNotIn        FilterOperator = "not-in"
 	FilterOperatorContains     FilterOperator = "contains"
@@ -104,7 +106,7 @@ func NotEqual(field string, value interface{}) NodeFilter {
 	return NewNodeFilter(field, FilterOperatorNotEqual, value)
 }
 
-// Match creates a filter for pattern matching (~=)
+// Match creates a filter for pattern matching.
 func Match(field string, value interface{}) NodeFilter {
 	return NewNodeFilter(field, FilterOperatorMatch, value)
 }
@@ -140,17 +142,32 @@ func LessEqual(field string, value interface{}) NodeFilter {
 }
 
 type Node struct {
-	UUID        string      `json:"uuid,omitempty"`
-	Fid         string      `json:"fid,omitempty"`
-	Title       string      `json:"title,omitempty"`
-	Mimetype    string      `json:"mimetype,omitempty"`
-	Parent      string      `json:"parent,omitempty"`
-	Owner       string      `json:"owner,omitempty"`
-	Group       string      `json:"group,omitempty"`
-	Permissions Permissions `json:"permissions,omitempty"`
-	Size        int         `json:"size,omitempty"`
-	CreatedAt   string      `json:"createdTime,omitempty"`
-	ModifiedAt  string      `json:"modifiedTime,omitempty"`
+	UUID                   string         `json:"uuid,omitempty"`
+	Fid                    string         `json:"fid,omitempty"`
+	Title                  string         `json:"title,omitempty"`
+	Name                   string         `json:"name,omitempty"`
+	Description            string         `json:"description,omitempty"`
+	Mimetype               string         `json:"mimetype,omitempty"`
+	Parent                 string         `json:"parent,omitempty"`
+	Owner                  string         `json:"owner,omitempty"`
+	Group                  string         `json:"group,omitempty"`
+	Groups                 []string       `json:"groups,omitempty"`
+	Permissions            *Permissions   `json:"permissions,omitempty"`
+	Size                   int            `json:"size,omitempty"`
+	CreatedAt              string         `json:"createdTime,omitempty"`
+	ModifiedAt             string         `json:"modifiedTime,omitempty"`
+	Fulltext               string         `json:"fulltext,omitempty"`
+	Locked                 bool           `json:"locked,omitempty"`
+	LockedBy               string         `json:"lockedBy,omitempty"`
+	UnlockAuthorizedGroups []string       `json:"unlockAuthorizedGroups,omitempty"`
+	Aspects                []string       `json:"aspects,omitempty"`
+	Properties             map[string]any `json:"properties,omitempty"`
+	Tags                   []string       `json:"tags,omitempty"`
+	Related                []string       `json:"related,omitempty"`
+	Filters                NodeFilters    `json:"filters,omitempty"`
+	Email                  string         `json:"email,omitempty"`
+	Phone                  string         `json:"phone,omitempty"`
+	HasWhatsapp            bool           `json:"hasWhatsapp,omitempty"`
 }
 
 // HumanReadableSize returns a human-readable representation of the node's size
@@ -177,11 +194,19 @@ func (n *Node) HumanReadableSize() string {
 	return fmt.Sprintf("%d%s", int(size), units[unitIndex])
 }
 
+type Permission string
+
+const (
+	PermissionRead   Permission = "Read"
+	PermissionWrite  Permission = "Write"
+	PermissionExport Permission = "Export"
+)
+
 type Permissions struct {
-	Group         []string       `json:"group,omitempty"`
-	Authenticated []string       `json:"authenticated,omitempty"`
-	Anonymous     []string       `json:"anonymous,omitempty"`
-	Advanced      map[string]any `json:"advanced,omitempty"`
+	Group         []Permission            `json:"group,omitempty"`
+	Authenticated []Permission            `json:"authenticated,omitempty"`
+	Anonymous     []Permission            `json:"anonymous,omitempty"`
+	Advanced      map[string][]Permission `json:"advanced,omitempty"`
 }
 
 // NodeCreate represents the request to create a node
@@ -208,172 +233,162 @@ type NodeFilterResult struct {
 	PageToken int    `json:"pageToken"`
 }
 
-// Feature represents a feature in the system
-type Feature struct {
-	UUID              string      `json:"uuid,omitempty"`
-	Name              string      `json:"name,omitempty"`
-	Description       string      `json:"description,omitempty"`
-	ExposeAsAction    bool        `json:"exposeAction,omitempty"`
-	RunOnCreates      bool        `json:"runOnCreates,omitempty"`
-	RunOnUpdates      bool        `json:"runOnUpdates,omitempty"`
-	RunManually       bool        `json:"runManually,omitempty"`
-	Filters           NodeFilters `json:"filters,omitempty"`
-	ExposeAsExtension bool        `json:"exposeExtension,omitempty"`
-	ExposeAITool      bool        `json:"exposeAITool,omitempty"`
-	RunAs             string      `json:"runAs,omitempty"`
-	GroupsAllowed     []string    `json:"groupsAllowed,omitempty"`
-	Parameters        []Parameter `json:"parameters,omitempty"`
-	ReturnType        string      `json:"returnType,omitempty"`
-	ReturnDescription string      `json:"returnDescription,omitempty"`
-	ReturnContentType string      `json:"returnContentType,omitempty"`
-}
-
-// Parameter represents a feature parameter
-type Parameter struct {
-	Name         string `json:"name,omitempty"`
-	Type         string `json:"type,omitempty"`
-	Description  string `json:"description,omitempty"`
-	Required     bool   `json:"required,omitempty"`
-	DefaultValue any    `json:"defaultValue,omitempty"`
-}
-
-// ActionRunRequest represents a request to run an action
-type ActionRunRequest struct {
-	UUIDs      []string       `json:"uuids"`
-	Parameters map[string]any `json:"parameters,omitempty"`
-}
-
-// Agent represents an AI agent
+// Agent represents an AI agent.
 type Agent struct {
-	UUID               string  `json:"uuid,omitempty"`
-	SystemInstructions string  `json:"systemInstructions,omitempty"`
-	Title              string  `json:"title,omitempty"`
-	Description        string  `json:"description,omitempty"`
-	Model              string  `json:"model,omitempty"`
-	Owner              string  `json:"owner,omitempty"`
-	CreatedAt          string  `json:"created,omitempty"`
-	ModifiedAt         string  `json:"updated,omitempty"`
-	Temperature        float64 `json:"temperature,omitempty"`
-	MaxTokens          int     `json:"maxTokens,omitempty"`
-	Reasoning          bool    `json:"reasoning,omitempty"`
-	UseTools           bool    `json:"useTools,omitempty"`
-	StructuredAnswer   string  `json:"structuredAnswer,omitempty"`
+	UUID           string `json:"uuid,omitempty"`
+	Name           string `json:"name,omitempty"`
+	Title          string `json:"title,omitempty"` // legacy field accepted for older servers/tests
+	Description    string `json:"description,omitempty"`
+	ExposedToUsers bool   `json:"exposedToUsers,omitempty"`
+	Model          string `json:"model,omitempty"`
+	Tools          any    `json:"tools,omitempty"`
+	SystemPrompt   string `json:"systemPrompt,omitempty"`
+	MaxLlmCalls    int    `json:"maxLlmCalls,omitempty"`
+	CreatedAt      string `json:"createdTime,omitempty"`
+	ModifiedAt     string `json:"modifiedTime,omitempty"`
 }
 
-// AgentCreate represents the request to create an agent
-type AgentCreate struct {
-	SystemInstructions string  `json:"systemInstructions"`
-	Title              string  `json:"title"`
-	Description        string  `json:"description,omitempty"`
-	Model              string  `json:"model,omitempty"`
-	Temperature        float64 `json:"temperature,omitempty"`
-	MaxTokens          int     `json:"maxTokens,omitempty"`
-	Reasoning          bool    `json:"reasoning,omitempty"`
-	UseTools           bool    `json:"useTools,omitempty"`
-	StructuredAnswer   string  `json:"structuredAnswer,omitempty"`
+func (a Agent) DisplayName() string {
+	if a.Name != "" {
+		return a.Name
+	}
+	return a.Title
 }
 
-// AgentChatRequest represents a chat request to an agent
+// CreateAgentRequest represents the request to create or replace an agent.
+type CreateAgentRequest struct {
+	UUID           string `json:"uuid,omitempty"`
+	Name           string `json:"name"`
+	Description    string `json:"description,omitempty"`
+	ExposedToUsers *bool  `json:"exposedToUsers,omitempty"`
+	Model          string `json:"model,omitempty"`
+	Tools          any    `json:"tools,omitempty"`
+	SystemPrompt   string `json:"systemPrompt,omitempty"`
+	MaxLlmCalls    int    `json:"maxLlmCalls,omitempty"`
+}
+
+type AgentCreate = CreateAgentRequest
+
+type ChatHistoryEntry struct {
+	Role      string `json:"role,omitempty"`
+	Text      string `json:"text,omitempty"`
+	Timestamp string `json:"timestamp,omitempty"`
+}
+
+type ChatOptions struct {
+	History      []ChatHistoryEntry `json:"history,omitempty"`
+	Files        []string           `json:"files,omitempty"`
+	Temperature  *float64           `json:"temperature,omitempty"`
+	MaxTokens    *int               `json:"maxTokens,omitempty"`
+	Instructions string             `json:"instructions,omitempty"`
+}
+
+type AnswerOptions struct {
+	Files        []string `json:"files,omitempty"`
+	Temperature  *float64 `json:"temperature,omitempty"`
+	MaxTokens    *int     `json:"maxTokens,omitempty"`
+	Instructions string   `json:"instructions,omitempty"`
+}
+
+// AgentChatRequest represents a chat request to an agent.
 type AgentChatRequest struct {
-	Text    string         `json:"text"`
-	Options map[string]any `json:"options,omitempty"`
+	Text    string       `json:"text"`
+	Options *ChatOptions `json:"options,omitempty"`
 }
 
-// AgentAnswerRequest represents an answer request to an agent
+// AgentAnswerRequest represents an answer request to an agent.
 type AgentAnswerRequest struct {
 	Text    string         `json:"text"`
-	Options map[string]any `json:"options,omitempty"`
+	Options *AnswerOptions `json:"options,omitempty"`
 }
 
-// RagChatRequest represents a RAG chat request
-type RagChatRequest struct {
-	Text    string         `json:"text"`
-	Options map[string]any `json:"options,omitempty"`
-}
-
-// APIKey represents an API key
+// APIKey represents an API key.
 type APIKey struct {
 	UUID        string `json:"uuid,omitempty"`
+	Title       string `json:"title,omitempty"`
 	Secret      string `json:"secret,omitempty"`
 	Group       string `json:"group,omitempty"`
 	Description string `json:"description,omitempty"`
-	Owner       string `json:"owner,omitempty"`
+	Active      bool   `json:"active,omitempty"`
+	CreatedAt   string `json:"createdTime,omitempty"`
+	Owner       string `json:"owner,omitempty"` // legacy field accepted for older servers/tests
 }
 
-// APIKeyCreate represents the request to create an API key
+// APIKeyCreate represents the request to create an API key.
 type APIKeyCreate struct {
 	Group       string `json:"group"`
 	Description string `json:"description,omitempty"`
+	Active      *bool  `json:"active,omitempty"`
 }
 
-// User represents a user account
+type CreateAPIKeyRequest = APIKeyCreate
+
+// User represents a user account.
 type User struct {
-	UUID   string   `json:"uuid,omitempty"`
-	Email  string   `json:"email,omitempty"`
-	Name   string   `json:"name,omitempty"`
-	Group  string   `json:"group,omitempty"`
-	Groups []string `json:"groups,omitempty"`
+	UUID        string   `json:"uuid,omitempty"` // legacy field accepted for older servers/tests
+	Email       string   `json:"email,omitempty"`
+	Title       string   `json:"title,omitempty"`
+	Name        string   `json:"name,omitempty"` // returned by /login/me
+	Group       string   `json:"group,omitempty"`
+	Groups      []string `json:"groups,omitempty"`
+	Phone       string   `json:"phone,omitempty"`
+	HasWhatsapp bool     `json:"hasWhatsapp,omitempty"`
+	Active      bool     `json:"active,omitempty"`
+	CreatedAt   string   `json:"createdTime,omitempty"`
+	ModifiedAt  string   `json:"modifiedTime,omitempty"`
 }
 
-// UserCreate represents the request to create a user
+func (u User) DisplayName() string {
+	if u.Title != "" {
+		return u.Title
+	}
+	return u.Name
+}
+
+// UserCreate represents the request to create a user.
 type UserCreate struct {
-	Email  string   `json:"email"`
-	Name   string   `json:"name"`
-	Group  string   `json:"group,omitempty"`
-	Groups []string `json:"groups,omitempty"`
+	Email       string   `json:"email"`
+	Title       string   `json:"title"`
+	Name        string   `json:"name,omitempty"` // legacy alias accepted by older callers
+	Group       string   `json:"group"`
+	Groups      []string `json:"groups,omitempty"`
+	Phone       string   `json:"phone,omitempty"`
+	HasWhatsapp bool     `json:"hasWhatsapp,omitempty"`
+	Active      *bool    `json:"active,omitempty"`
 }
 
-// UserUpdate represents the request to update a user
+type CreateUserRequest = UserCreate
+
+// UserUpdate represents the request to update a user.
 type UserUpdate struct {
-	Name   string   `json:"name,omitempty"`
-	Group  string   `json:"group,omitempty"`
-	Groups []string `json:"groups,omitempty"`
+	Title       string   `json:"title,omitempty"`
+	Name        string   `json:"name,omitempty"` // legacy alias accepted by older callers
+	Group       string   `json:"group,omitempty"`
+	Groups      []string `json:"groups,omitempty"`
+	Phone       string   `json:"phone,omitempty"`
+	HasWhatsapp bool     `json:"hasWhatsapp,omitempty"`
+	Active      *bool    `json:"active,omitempty"`
 }
 
-// Group represents a group
+type UpdateUserRequest = UserUpdate
+
+// Group represents a group.
 type Group struct {
-	UUID  string `json:"uuid,omitempty"`
-	Title string `json:"title,omitempty"`
+	UUID        string `json:"uuid,omitempty"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	CreatedAt   string `json:"createdTime,omitempty"`
 }
 
-// GroupCreate represents the request to create a group
+// GroupCreate represents the request to create a group.
 type GroupCreate struct {
-	Title string `json:"title"`
+	UUID        string `json:"uuid,omitempty"`
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
 }
 
-// GroupUpdate represents the request to update a group
-type GroupUpdate struct {
-	Title string `json:"title,omitempty"`
-}
+type CreateGroupRequest = GroupCreate
 
-// Template represents a template
-type Template struct {
-	UUID     string `json:"uuid,omitempty"`
-	Mimetype string `json:"mimetype,omitempty"`
-	Size     int    `json:"size,omitempty"`
-}
-
-// Aspect represents an aspect
-type Aspect struct {
-	UUID        string       `json:"uuid,omitempty"`
-	Title       string       `json:"title,omitempty"`
-	Name        string       `json:"name,omitempty"`
-	Description string       `json:"description,omitempty"`
-	Mimetype    string       `json:"mimetype,omitempty"`
-	Owner       string       `json:"owner,omitempty"`
-	Permissions *Permissions `json:"permissions,omitempty"`
-}
-
-// AspectCreate represents the request to create an aspect
-type AspectCreate struct {
-	Title       string       `json:"title"`
-	Name        string       `json:"name"`
-	Description string       `json:"description,omitempty"`
-	Mimetype    string       `json:"mimetype"`
-	Permissions *Permissions `json:"permissions,omitempty"`
-}
-
-// Breadcrumb represents a breadcrumb item
 type Breadcrumb struct {
 	UUID  string `json:"uuid"`
 	Title string `json:"title"`

@@ -21,13 +21,14 @@ func (c *FindCommand) Execute(args []string) {
 	if len(args) == 0 {
 		fmt.Println("Usage: find <criteria>")
 		fmt.Println("  Simple: find some text")
-		fmt.Println("  Complex: find title == Document,owner ~= admin,size > 1000")
+		fmt.Println("  Complex: find title == Document,owner match admin,size > 1000")
 		return
 	}
 
 	searchText := strings.Join(args, " ")
+	filters := extractSingleFilter(normalizeOperators(searchText))
 
-	result, err := client.FindNodes(searchText, 20, 1)
+	result, err := client.FindNodes(filters, 20, 1)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return

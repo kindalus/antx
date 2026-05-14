@@ -21,7 +21,7 @@ func (c *ReloadCommand) Execute(args []string) {
 		fmt.Println("Usage: reload")
 		fmt.Println()
 		fmt.Println("Description:")
-		fmt.Println("  Refresh the cached lists of aspects, actions, extensions, and agents")
+		fmt.Println("  Refresh the cached list of agents")
 		fmt.Println("  from the server. This is useful when new resources have been added")
 		fmt.Println("  or modified on the server since the CLI was started.")
 		fmt.Println()
@@ -37,9 +37,6 @@ func (c *ReloadCommand) Execute(args []string) {
 	}
 
 	fmt.Printf("Successfully reloaded all cached data:\n")
-	fmt.Printf("  - %d aspects\n", len(GetCachedAspects()))
-	fmt.Printf("  - %d actions\n", len(GetCachedActions()))
-	fmt.Printf("  - %d extensions\n", len(GetCachedExtensions()))
 	fmt.Printf("  - %d agents\n", len(GetCachedAgents()))
 }
 

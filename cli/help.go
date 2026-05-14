@@ -56,12 +56,11 @@ func (c *HelpCommand) Execute(args []string) {
 	// Define command categories
 	categories := map[string][]string{
 		"Navigation & Browsing": {"cd", "ls", "pwd", "find", "stat"},
-		"File Operations":       {"cp", "duplicate", "mv", "rename", "rm", "upload", "download"},
+		"File Operations":       {"cp", "clone", "mv", "rename", "rm", "upload", "download"},
 		"Folder Management":     {"mkdir", "mksmart"},
-		"Actions & Extensions":  {"run", "exec", "actions", "extensions"},
-		"AI & Agents":           {"chat", "answer", "rag", "agents"},
+		"AI & Agents":           {"agents"},
 		"Session Management":    {"sessions"},
-		"Templates & Docs":      {"templates", "docs"},
+		"Docs":                  {"docs"},
 		"System Management":     {"aliases", "history", "reload", "status", "help", "exit"},
 	}
 
@@ -70,10 +69,9 @@ func (c *HelpCommand) Execute(args []string) {
 		"Navigation & Browsing",
 		"File Operations",
 		"Folder Management",
-		"Actions & Extensions",
 		"AI & Agents",
 		"Session Management",
-		"Templates & Docs",
+		"Docs",
 		"System Management",
 	} {
 		fmt.Printf("%s:\n", category)
@@ -120,7 +118,8 @@ func (c *HelpCommand) Execute(args []string) {
 	}
 
 	fmt.Printf("Type 'help <command>' for detailed usage information. (%d commands total)\n", len(commands))
-	fmt.Println("Use Tab completion for command and argument suggestions.")
+	fmt.Println("Agent shortcuts: /[agent_uuid] starts chat, @[agent_uuid] asks once.")
+	fmt.Println("Use Tab completion for command, shortcut, and argument suggestions.")
 }
 
 func (c *HelpCommand) Suggest(d prompt.Document) []prompt.Suggest {
