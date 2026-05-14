@@ -21,12 +21,15 @@ To start using `antx`, you need to connect to an Antbox server.
 antx [server_url] --api-key [your_api_key]
 ```
 
-You can also authenticate using a JWT token or root password:
+You can also authenticate using a JWT token, root password, or Lightray browser/device login:
 
 ```bash
 antx [server_url] --jwt [your_jwt_token]
 antx [server_url] --root [root_password]
+antx https://vcrm.lightray.cloud --auth-lightray
 ```
+
+With `--auth-lightray`, the URL is treated as the Lightray URL and `antx` uses `${url}/api` as the Antbox API endpoint. The CLI prints a browser verification link and device code, then waits for approval. The default Lightray OAuth client ID is `terminal-cli`; override it with `--lightray-client-id` if your deployment uses a different device-flow client.
 
 ### Basic Commands
 

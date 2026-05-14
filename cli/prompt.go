@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -281,14 +283,55 @@ func completer(d prompt.Document) []prompt.Suggest {
 	return []prompt.Suggest{}
 }
 
-func Start(serverURL, apiKey, root, jwt string, debug bool) {
-	client = antbox.NewClient(serverURL, apiKey, root, jwt, debug)
-	if root != "" {
-		if err := client.Login(); err != nil {
-			fmt.Println("Login failed:", err)
-			os.Exit(1)
+func newClientForStartOptions(ctx context.Context, options StartOptions, output io.Writer) (antbox.Antbox, error) {
+	if err := options.Validate(); err != nil {
+		return nil, err
+	}
+
+	serverURL := options.ServerURL
+	jwt := options.JWT
+	if options.AuthLightray {
+		apiURL, err := lightrayAPIURL(options.ServerURL)
+		if err != nil {
+			return nil, err
+		}
+
+		token, err := authenticateWithLightray(ctx, options.ServerURL, options.effectiveLightrayClientID(), output)
+		if err != nil {
+			return nil, fmt.Errorf("Lightray authentication failed: %w", err)
+		}
+
+		serverURL = apiURL
+		jwt = token
+	}
+
+	configuredClient := antbox.NewClient(serverURL, options.APIKey, options.Root, jwt, options.Debug)
+	if options.Root != "" {
+		if err := configuredClient.Login(); err != nil {
+			return nil, fmt.Errorf("login failed: %w", err)
 		}
 	}
+
+	return configuredClient, nil
+}
+
+func Start(serverURL, apiKey, root, jwt string, debug bool) {
+	StartWithOptions(StartOptions{
+		ServerURL: serverURL,
+		APIKey:    apiKey,
+		Root:      root,
+		JWT:       jwt,
+		Debug:     debug,
+	})
+}
+
+func StartWithOptions(options StartOptions) {
+	configuredClient, err := newClientForStartOptions(context.Background(), options, os.Stdout)
+	if err != nil {
+		fmt.Println("Startup failed:", err)
+		os.Exit(1)
+	}
+	client = configuredClient
 
 	// Initialize current node and load cached data at startup
 	initializeCurrentNodeAndCacheData()
