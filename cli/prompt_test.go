@@ -1296,6 +1296,26 @@ func TestCommandExecuteCoverageForNonInteractiveCommands(t *testing.T) {
 	}
 }
 
+func TestAuditCommandHidesPayloadUnlessVerbose(t *testing.T) {
+	client = &mockClient{}
+
+	output := captureOutput(t, func() { (&AuditCommand{}).Execute([]string{"test-uuid"}) })
+	if strings.Contains(output, "Payload") || strings.Contains(output, "Old") || strings.Contains(output, "deleted") {
+		t.Fatalf("expected default audit output to hide payload, got %q", output)
+	}
+	if !strings.Contains(output, "#1     NodeUpdatedEvent") || !strings.Contains(output, "#2     NodeDeletedEvent") {
+		t.Fatalf("expected audit event summary lines, got %q", output)
+	}
+	if strings.Index(output, "#2     NodeDeletedEvent") > strings.Index(output, "#1     NodeUpdatedEvent") {
+		t.Fatalf("expected audit events sorted by descending sequence, got %q", output)
+	}
+
+	verboseOutput := captureOutput(t, func() { (&AuditCommand{}).Execute([]string{"-v", "test-uuid"}) })
+	if !strings.Contains(verboseOutput, "Payload:") || !strings.Contains(verboseOutput, "Old") || !strings.Contains(verboseOutput, "deleted") {
+		t.Fatalf("expected verbose audit output to include payload, got %q", verboseOutput)
+	}
+}
+
 func TestGetCommandsReturnsRegistry(t *testing.T) {
 	registered := GetCommands()
 	if registered["ls"] == nil || registered["agents"] == nil {

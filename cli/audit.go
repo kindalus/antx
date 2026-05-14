@@ -20,11 +20,26 @@ func (c *AuditCommand) GetDescription() string {
 
 func (c *AuditCommand) Execute(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: audit <uuid>")
+		fmt.Println("Usage: audit [-v] <uuid>")
 		return
 	}
 
-	nodeUUID := args[0]
+	verbose := false
+	var nodeUUID string
+	for _, arg := range args {
+		switch arg {
+		case "-v", "--verbose":
+			verbose = true
+		default:
+			if nodeUUID == "" {
+				nodeUUID = arg
+			}
+		}
+	}
+	if nodeUUID == "" {
+		fmt.Println("Usage: audit [-v] <uuid>")
+		return
+	}
 	node, err := client.GetNode(nodeUUID)
 	if err != nil {
 		fmt.Println("Error getting node:", err)
@@ -51,15 +66,12 @@ func (c *AuditCommand) Execute(args []string) {
 		return events[i].Sequence > events[j].Sequence
 	})
 
+	fmt.Printf("%-6s %-24s  %-24s  %s\n", "SEQ", "EVENT", "OCCURRED", "USER")
+	fmt.Printf("%-6s %-24s  %-24s  %s\n", "-----", "-----", "--------", "----")
+
 	for _, event := range events {
-		fmt.Printf("#%d  %s  %s  %s\n", event.Sequence, event.EventType, event.OccurredOn, event.UserEmail)
-		if event.EventID != "" {
-			fmt.Printf("Event ID: %s\n", event.EventID)
-		}
-		if event.Tenant != "" {
-			fmt.Printf("Tenant  : %s\n", event.Tenant)
-		}
-		if len(event.Payload) > 0 {
+		fmt.Printf("#%-5d %s  %s  %s\n", event.Sequence, event.EventType, event.OccurredOn, event.UserEmail)
+		if verbose && len(event.Payload) > 0 {
 			payload, err := json.MarshalIndent(event.Payload, "", "  ")
 			if err != nil {
 				fmt.Printf("Payload : %v\n", event.Payload)
@@ -67,7 +79,9 @@ func (c *AuditCommand) Execute(args []string) {
 				fmt.Printf("Payload:\n%s\n", payload)
 			}
 		}
-		fmt.Println()
+		if verbose {
+			fmt.Println()
+		}
 	}
 }
 
